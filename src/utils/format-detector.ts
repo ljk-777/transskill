@@ -42,6 +42,21 @@ export function detectFormatFromPath(localPath: string): FormatDetectionResult {
   }
 
   if (ext === '.md') {
+    // Check if it's SOUL.md by filename
+    const baseName = localPath.split('/').pop() || localPath.split('\\').pop() || '';
+    if (baseName === 'SOUL.md') {
+      return { format: 'soul.md', isDirectory: false };
+    }
+    // Check content for SOUL.md signature
+    try {
+      const content = readFileSync(localPath, 'utf-8');
+      const firstLine = content.split('\n')[0]?.trim() || '';
+      if (/^#\s+SOUL\.md/i.test(firstLine)) {
+        return { format: 'soul.md', isDirectory: false };
+      }
+    } catch {
+      // fall through to default
+    }
     return { format: 'skill.md', isDirectory: false };
   }
 

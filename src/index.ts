@@ -5,9 +5,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { registerResolver, LocalResolver, GitHubResolver, resolveInput } from './resolver/index.js';
-import { registerParser, SKILLMdParser, CursorRulesParser, MdcParser, getRegisteredFormats } from './parser/index.js';
+import { registerParser, SKILLMdParser, CursorRulesParser, MdcParser, MCPJsonParser, SOULMdParser, getRegisteredFormats } from './parser/index.js';
 import { DefaultMapper } from './mapper/index.js';
-import { registerRenderer, SKILLMdRenderer, CursorRulesRenderer, MdcRenderer, getRegisteredRenderers } from './renderer/index.js';
+import { registerRenderer, SKILLMdRenderer, CursorRulesRenderer, MdcRenderer, MCPJsonRenderer, getRegisteredRenderers } from './renderer/index.js';
 import { detectFormatFromPath } from './utils/format-detector.js';
 import { writeOutput, ensureDir, displayPath } from './utils/file-utils.js';
 import type { FormatType, SkillDirectory } from './core/types.js';
@@ -26,12 +26,15 @@ registerResolver(new LocalResolver());
 registerParser(new SKILLMdParser());
 registerParser(new CursorRulesParser());
 registerParser(new MdcParser());
+registerParser(new MCPJsonParser());
+registerParser(new SOULMdParser());
 
 const mapper = new DefaultMapper();
 
 registerRenderer(new SKILLMdRenderer());
 registerRenderer(new CursorRulesRenderer());
 registerRenderer(new MdcRenderer());
+registerRenderer(new MCPJsonRenderer());
 
 // ============================================================
 // CLI
@@ -47,7 +50,7 @@ program
 program
   .command('convert <input>')
   .description('Convert a skill file/directory/GitHub repo to another format')
-  .requiredOption('-t, --to <format>', 'Target format (skill.md, .cursorrules, .mdc)')
+  .requiredOption('-t, --to <format>', 'Target format (skill.md, .cursorrules, .mdc, mcp.json)')
   .option('-o, --output <path>', 'Output directory (default: current directory)')
   .option('--install-to <path>', 'Install directly to target agent config directory')
   .option('--glob <pattern>', 'File glob pattern (for .mdc output)')
@@ -214,7 +217,8 @@ program
     console.log('   SKILL.md    → .cursorrules, .mdc');
     console.log('   .cursorrules → SKILL.md, .mdc');
     console.log('   .mdc        → SKILL.md, .cursorrules');
-    console.log('   MCP JSON    → SKILL.md');
+    console.log('   MCP JSON    → SKILL.md, .cursorrules, .mdc');
+    console.log('   SOUL.md     → SKILL.md, .cursorrules, .mdc');
     console.log('');
     console.log('   Input sources:');
     console.log('     ./file           Local file');
