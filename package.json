@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Cross-platform AI agent skill converter - Write once, run on any agent",
   "bin": {
-    "transskill": "./dist/index.js"
+    "transskill": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",

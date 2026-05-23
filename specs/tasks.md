@@ -20,6 +20,21 @@
 
 ---
 
+## 🧭 远景规划：Marketplace + Security（独立时间线）
+
+> 详见 [marketplace-vision.md](./marketplace-vision.md) — 非当前实施阶段
+
+| Phase | 内容 | 预估 | 备注 |
+|:-----|:------|:----:|:-----|
+| **Phase A** | Registry MVP（search / install / list） | 2 周 | GitHub 组织或 npm 生态 |
+| **Phase B** | Security Audit L1-L3（指令/shell/权限） | 1 周 | 安全评分机制 |
+| **Phase C** | transskill.json 项目 + 版本管理 | 1 周 | lockfile 依赖管理 |
+| **Phase D** | publish 流程 + 社区贡献 | 1 周 | 审核机制待定 |
+| **Phase E** | MCP 专项审计 + Web UI | 2 周 | 沙箱动态检测 |
+| **Phase F** | 自动更新 + CI 集成 | 1 周 | Dependabot 风格 |
+
+---
+
 ---
 
 ## Phase 0 — 项目脚手架

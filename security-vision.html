@@ -1,0 +1,109 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TransSkill Security Audit</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f8fafc; --fg: #172033; --muted: #5b6475; --line: #64748b; --neutral: #e2e8f0; --safe: #bbf7d0; --warn: #fde68a; --danger: #fecaca; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --fg: #e5e7eb; --muted: #a3adbd; --line: #94a3b8; --neutral: #334155; --safe: #14532d; --warn: #713f12; --danger: #7f1d1d; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  main { max-width: 960px; margin: 32px auto; padding: 0 20px; }
+  svg { width: 100%; height: auto; display: block; }
+  .title { font-size: 20px; font-weight: 650; fill: var(--fg); }
+  .label { font-size: 14px; font-weight: 600; fill: var(--fg); }
+  .sml { font-size: 11px; fill: var(--muted); }
+  .node { stroke: var(--line); stroke-width: 1; rx: 6; ry: 6; }
+  .neutral { fill: var(--neutral); } .safe { fill: var(--safe); } .warn { fill: var(--warn); } .danger { fill: var(--danger); }
+  .edge { stroke: var(--line); stroke-width: 1.5; fill: none; }
+  .zone { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 6 5; opacity: 0.7; }
+</style>
+<main>
+<svg viewBox="0 0 900 540">
+  <text x="20" y="30" class="title">🛡️  TransSkill Security Audit — Trust Pipeline</text>
+  <text x="20" y="48" class="sml">Every skill goes through multi-layer checks before &amp; after installation</text>
+
+  <!-- === Pipeline: left to right === -->
+  <!-- Step 1: Submit -->
+  <rect x="30" y="80" width="160" height="70" class="node neutral" />
+  <text x="75" y="108" class="label">📤 Submit</text>
+  <text x="38" y="125" class="sml">user publishes skill</text>
+  <text x="38" y="138" class="sml">to registry</text>
+
+  <path d="M 190 115 L 230 115" class="edge" marker-end="url(#a)" />
+
+  <!-- Step 2: Static Analysis -->
+  <rect x="240" y="80" width="200" height="70" class="node neutral" />
+  <text x="290" y="105" class="label">🔍 Static Analysis</text>
+  <text x="248" y="122" class="sml">scan for dangerous patterns</text>
+  <text x="248" y="135" class="sml">in instructions &amp; scripts</text>
+
+  <path d="M 440 115 L 480 115" class="edge" marker-end="url(#a)" />
+
+  <!-- Step 3: Permission Audit -->
+  <rect x="490" y="80" width="200" height="70" class="node neutral" />
+  <text x="535" y="105" class="label">📋 Permission Audit</text>
+  <text x="498" y="122" class="sml">what does this skill access?</text>
+  <text x="498" y="135" class="sml">files / network / env / shell</text>
+
+  <path d="M 690 115 L 730 115" class="edge" marker-end="url(#a)" />
+
+  <!-- Step 4: Report -->
+  <rect x="740" y="80" width="140" height="70" class="node neutral" />
+  <text x="770" y="105" class="label">📊 Report</text>
+  <text x="748" y="122" class="sml">risk score + details</text>
+  <text x="748" y="135" class="sml">✅ / ⚠️ / ❌</text>
+
+  <!-- === Scoring examples === -->
+  <text x="20" y="210" class="label">Risk Scoring Examples</text>
+
+  <!-- Safe row -->
+  <rect x="20" y="225" width="280" height="50" rx="8" class="node safe" />
+  <text x="55" y="250" class="label">✅ Safe (Score 90-100)</text>
+  <text x="30" y="265" class="sml">read-only, no network, no shell exec</text>
+
+  <text x="315" y="260" class="sml" style="font-size:12px">→ "weather skill": reads API, returns text</text>
+
+  <!-- Warning row -->
+  <rect x="20" y="290" width="280" height="50" rx="8" class="node warn" />
+  <text x="50" y="315" class="label">⚠️  Suspicious (50-89)</text>
+  <text x="30" y="330" class="sml">has shell access or file writes</text>
+
+  <text x="315" y="325" class="sml" style="font-size:12px">→ "deploy helper": runs git, modifies files</text>
+
+  <!-- Danger row -->
+  <rect x="20" y="355" width="280" height="50" rx="8" class="node danger" />
+  <text x="55" y="380" class="label">❌ Dangerous (0-49)</text>
+  <text x="30" y="395" class="sml">obfuscated / data exfil / crypto</text>
+
+  <text x="315" y="390" class="sml" style="font-size:12px">→ "system helper": curl to unknown host, base64 decode</text>
+
+  <!-- === Audit details === -->
+  <rect x="580" y="220" width="300" height="190" rx="8" class="node neutral" />
+  <text x="600" y="245" class="label">transskill audit &lt;skill&gt;</text>
+  <text x="600" y="268" class="sml">┌─────────────────────────┐</text>
+  <text x="600" y="283" class="sml">│ 📦 weather@1.0.0              │</text>
+  <text x="600" y="298" class="sml">│ ✅ Score: 94 / 100            │</text>
+  <text x="600" y="313" class="sml">│                               │</text>
+  <text x="600" y="328" class="sml">│ ✓ Instructions: safe          │</text>
+  <text x="600" y="343" class="sml">│ ✓ No shell commands           │</text>
+  <text x="600" y="358" class="sml">│ ✓ No file writes              │</text>
+  <text x="600" y="373" class="sml">│ ✓ Uses well-known API         │</text>
+  <text x="600" y="388" class="sml">│ ✓ Published 90d ago           │</text>
+  <text x="600" y="403" class="sml">│ └─────────────────────────┘</text>
+
+  <!-- MCP Server specific -->
+  <text x="20" y="470" class="label">🔌  MCP Server Special Checks</text>
+  <text x="20" y="490" class="sml">MCP servers run arbitrary commands — extra scrutiny required</text>
+
+  <rect x="20" y="500" width="420" height="40" rx="6" class="node neutral" />
+  <text x="30" y="525" class="sml">🔧 Command injection?  ·  🌐 Network scope?  ·  📁 Filesystem access?</text>
+
+  <rect x="460" y="500" width="420" height="40" rx="6" class="node neutral" />
+  <text x="470" y="525" class="sml">🔑 Env variable leaks?  ·  🏗️  Build steps?  ·  📦 Dependency chain?</text>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="var(--line)" />
+    </marker>
+  </defs>
+</svg>
+</main>
