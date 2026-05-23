@@ -241,6 +241,87 @@ program
   });
 
 program
+  .command('diff <input>')
+  .description('Preview what would be lost when converting between formats')
+  .requiredOption('-t, --to <format>', 'Target format to check against')
+  .option('-v, --verbose', 'Show detailed field-level mapping')
+  .action(async (input, options) => {
+    try {
+      const resolved = await resolveInput(input);
+      const { detectFormatFromPath } = await import('./utils/format-detector.js');
+      const { readInput } = await import('./utils/file-utils.js');
+      const { getParser } = await import('./parser/parser-registry.js');
+
+      const { format: sourceFormat, isDirectory } = detectFormatFromPath(resolved.localPath);
+      const targetFormat = options.to;
+
+      let content: string;
+      let skill;
+      const parser = getParser(sourceFormat);
+
+      if (isDirectory) {
+        const { scanSkillDirectory, skillDirToAttachedFiles } = await import('./utils/directory-scanner.js');
+        const skillDir = scanSkillDirectory(resolved.localPath);
+        content = readInput(skillDir.skillFile);
+        skill = parser.parse(content, skillDir.skillFile);
+        const attached = skillDirToAttachedFiles(skillDir);
+        if (attached.length > 0) {
+          skill.metadata.attachedFiles = attached;
+        }
+      } else {
+        content = readInput(resolved.localPath);
+        skill = parser.parse(content, resolved.localPath);
+      }
+
+      const mapper = new DefaultMapper();
+      const { skill: mapped, report } = mapper.map(skill, targetFormat);
+
+      console.log('');
+      console.log(`  ${'─'.repeat(50)}`);
+      console.log(`  📋  Conversion Impact Report`);
+      console.log(`  ${'─'.repeat(50)}`);
+      console.log(`  ${sourceFormat}${isDirectory ? ' (directory)' : ''}`);
+      console.log(`  ${'↓'.padStart(25)}`);
+      console.log(`  ${targetFormat}`);
+      console.log(`  ${'─'.repeat(50)}`);
+      console.log(`  ✅ Preserved: ${report.preserved.length > 0 ? report.preserved.join(', ') : '(nothing specific)'}`);
+      console.log(`  ❌ Lost:      ${report.lost.length > 0 ? report.lost.join(', ') : '(none)'}`);
+      console.log('');
+
+      if (report.warnings.length > 0) {
+        console.log('  ⚠️  Warnings:');
+        for (const w of report.warnings) {
+          console.log(`     • ${w}`);
+        }
+        console.log('');
+      }
+
+      // Check for attached files
+      if (skill.metadata.attachedFiles && skill.metadata.attachedFiles.length > 0) {
+        const count = skill.metadata.attachedFiles.length;
+        if (targetFormat === '.cursorrules') {
+          console.log(`  📁 ${count} attached file(s) will be copied alongside the output`);
+          console.log(`     (scripts, references, assets are preserved as sidecar files)`);
+        } else {
+          console.log(`  📁 ${count} attached file(s) will be preserved`);
+        }
+        console.log('');
+      }
+
+      console.log(`  ${'─'.repeat(50)}`);
+      console.log('');
+
+      if (resolved.cleanup) await resolved.cleanup();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`
+❌ Diff failed: ${message}
+`);
+      process.exit(1);
+    }
+  });
+
+program
   .command('validate <input>')
   .description('Validate a skill file or directory')
   .option('-f, --format <format>', 'Specify input format (auto-detected if omitted)')
