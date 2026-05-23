@@ -2,6 +2,7 @@ import { readFileSync, statSync, existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { detectFormat } from '../parser/parser-registry.js';
 import type { FormatType } from '../core/types.js';
+import { TransSkillError } from '../core/errors.js';
 
 export interface FormatDetectionResult {
   format: FormatType;
@@ -51,7 +52,9 @@ export function detectFormatFromPath(localPath: string): FormatDetectionResult {
     return { format: detected, isDirectory: false };
   }
 
-  throw new Error(
+  throw new TransSkillError(
     `Unable to detect format for: ${localPath}. Use --format to specify manually.`,
+    'UNSUPPORTED_INPUT',
+    { localPath },
   );
 }

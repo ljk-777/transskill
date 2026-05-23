@@ -1,5 +1,6 @@
 import type { Parser } from './parser.interface.js';
 import type { FormatType } from '../core/types.js';
+import { TransSkillError } from '../core/errors.js';
 
 const parserRegistry = new Map<FormatType, Parser>();
 
@@ -17,7 +18,7 @@ export function registerParser(parser: Parser): void {
 export function getParser(format: FormatType): Parser {
   const parser = parserRegistry.get(format);
   if (!parser) {
-    throw new Error(`Unsupported format: ${format}`);
+    throw new TransSkillError(`Unsupported format: ${format}`, 'UNSUPPORTED_OUTPUT_FORMAT');
   }
   return parser;
 }

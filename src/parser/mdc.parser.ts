@@ -2,6 +2,7 @@ import matter from 'gray-matter';
 import { basename, extname } from 'node:path';
 import type { Parser } from './parser.interface.js';
 import type { FormatType, IntermediateSkill, SkillDirectory } from '../core/types.js';
+import { TransSkillError } from '../core/errors.js';
 
 /**
  * Parser for .mdc format (Cursor 2.3+ rules).
@@ -64,6 +65,10 @@ export class MdcParser implements Parser {
   }
 
   parseDirectory(dirPath: string): SkillDirectory {
-    throw new Error('.mdc does not support directory parsing — use single file mode');
+    throw new TransSkillError(
+      '.mdc format does not support directory parsing — use single file mode',
+      'UNSUPPORTED_INPUT',
+      { dirPath },
+    );
   }
 }
