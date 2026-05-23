@@ -1,3 +1,5 @@
+import { join, basename, extname, dirname } from 'node:path';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import matter from 'gray-matter';
 import type { Parser } from './parser.interface.js';
 import type { FormatType, IntermediateSkill, SkillDirectory } from '../core/types.js';
@@ -79,8 +81,8 @@ export class SKILLMdParser implements Parser {
   }
 
   parseDirectory(dirPath: string): SkillDirectory {
-    const { join } = require('node:path');
-    const { existsSync, readdirSync, statSync } = require('node:fs');
+    
+    
 
     const skillMdPath = join(dirPath, 'SKILL.md');
     if (!existsSync(skillMdPath)) {
@@ -91,7 +93,7 @@ export class SKILLMdParser implements Parser {
       );
     }
 
-    const name = require('node:path').basename(dirPath);
+    const name = basename(dirPath);
     const extraFiles: string[] = [];
     let scriptsDir: string | undefined;
     let referencesDir: string | undefined;
@@ -137,7 +139,7 @@ export class SKILLMdParser implements Parser {
 /** Guess skill name from file path */
 function guessName(filePath?: string): string | undefined {
   if (!filePath) return undefined;
-  const { basename, extname } = require('node:path');
+  
   const name = basename(filePath, extname(filePath));
-  return name === 'SKILL' ? basename(require('node:path').dirname(filePath)) : name;
+  return name === 'SKILL' ? basename(dirname(filePath)) : name;
 }

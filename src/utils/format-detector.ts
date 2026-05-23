@@ -1,5 +1,5 @@
-import { readFileSync, statSync, existsSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs';
+import { extname, join, basename } from 'node:path';
 import { detectFormat } from '../parser/parser-registry.js';
 import type { FormatType } from '../core/types.js';
 import { TransSkillError } from '../core/errors.js';
@@ -10,17 +10,48 @@ export interface FormatDetectionResult {
 }
 
 /**
+/**
+ * Determine format by filename.
+ */
+function formatByFilename(filename: string): FormatDetectionResult {
+  const name = basename(filename);
+  if (name === 'SKILL.md') return { format: 'skill.md', isDirectory: true };
+  if (name === 'SOUL.md') return { format: 'soul.md', isDirectory: true };
+  if (name === 'CLAUDE.md' || name === 'claude.md') return { format: 'claude.md', isDirectory: true };
+  if (name === 'AGENTS.md') return { format: 'agents.md', isDirectory: true };
+  if (name.endsWith('.cursorrules')) return { format: '.cursorrules', isDirectory: true };
+  if (name.endsWith('.mdc')) return { format: '.mdc', isDirectory: true };
+  return { format: 'skill.md', isDirectory: true };
+}
+
+/**
  * Detect format from a local file or directory path.
- * For directories, checks if it contains a SKILL.md.
  */
 export function detectFormatFromPath(localPath: string): FormatDetectionResult {
   const stat = statSync(localPath);
 
   if (stat.isDirectory()) {
-    // Directory mode - check for SKILL.md
-    if (existsSync(join(localPath, 'SKILL.md'))) {
-      return { format: 'skill.md', isDirectory: true };
+    // Directory mode - check for known skill files in priority order
+    const priorityFiles = ['SKILL.md', 'SOUL.md', 'CLAUDE.md', 'claude.md', 'AGENTS.md'];
+    const dirEntries = readdirSync(localPath);
+
+    for (const pf of priorityFiles) {
+      if (dirEntries.includes(pf)) {
+        return formatByFilename(pf);
+      }
     }
+
+    // Check for .cursorrules or .mdc as main file
+    const hasCursorrules = dirEntries.find((f) => f.endsWith('.cursorrules'));
+    if (hasCursorrules) {
+      return { format: '.cursorrules', isDirectory: true };
+    }
+    const hasMdc = dirEntries.find((f) => f.endsWith('.mdc'));
+    if (hasMdc) {
+      return { format: '.mdc', isDirectory: true };
+    }
+
+    // Fallback: SKILL.md
     return { format: 'skill.md', isDirectory: true };
   }
 
