@@ -1,0 +1,9 @@
+---
+description: TypeScript coding conventions for this project
+globs: "**/*.ts"
+alwaysApply: false
+---
+
+Prefer named exports over default exports
+Use strict null checks; no non-null assertions
+Document exported functions with TSDoc
