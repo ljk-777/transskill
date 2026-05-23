@@ -10,6 +10,7 @@ import { DefaultMapper } from './mapper/index.js';
 import { registerRenderer, SKILLMdRenderer, CursorRulesRenderer, MdcRenderer, MCPJsonRenderer, ClaudeMDRenderer, getRegisteredRenderers } from './renderer/index.js';
 import { detectFormatFromPath } from './utils/format-detector.js';
 import { writeOutput, ensureDir, displayPath } from './utils/file-utils.js';
+import { scanSkillDirectory, skillDirToAttachedFiles } from './utils/directory-scanner.js';
 import type { FormatType, SkillDirectory } from './core/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -111,13 +112,18 @@ program
 
       // Step 5: Process
       if (isDirectory) {
-        // Directory mode
-        const skillDir = parser.parseDirectory(resolved.localPath);
+        // Directory mode — scan and parse
+        const skillDir = scanSkillDirectory(resolved.localPath);
+        const attachedFiles = skillDirToAttachedFiles(skillDir);
 
-        // Read and parse SKILL.md
         const { readInput } = await import('./utils/file-utils.js');
         const content = readInput(skillDir.skillFile);
         const skill = parser.parse(content, skillDir.skillFile);
+
+        // Preserve attached files metadata through the pipeline
+        if (attachedFiles.length > 0) {
+          skill.metadata.attachedFiles = attachedFiles;
+        }
 
         // Apply mapper
         const { skill: mapped, report } = mapper.map(skill, targetFormat);

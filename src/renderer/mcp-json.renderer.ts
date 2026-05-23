@@ -2,21 +2,14 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Renderer } from './renderer.interface.js';
 import type { FormatType, IntermediateSkill, SkillDirectory, DirectoryConversionResult } from '../core/types.js';
+import { copyAttachedFiles } from '../utils/file-copier.js';
 
-/**
- * Renders IntermediateSkill to MCP JSON format.
- *
- * Output: { name, description, tools[] }
- * Only includes tools from platformSpecific.mcp.tools.
- * Falls back to generating a single tool from the skill instructions.
- */
 export class MCPJsonRenderer implements Renderer {
   readonly format: FormatType = 'mcp.json';
   readonly extension = '.json';
 
   render(skill: IntermediateSkill): string {
     const tools = skill.platformSpecific.mcp?.tools;
-
     const output: Record<string, unknown> = {
       name: skill.name,
       description: skill.description,
@@ -29,16 +22,11 @@ export class MCPJsonRenderer implements Renderer {
         inputSchema: t.inputSchema,
       }));
     } else {
-      // Fallback: generate a single tool from instructions
       output.tools = [
         {
           name: skill.name.replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
           description: skill.description || 'Tool generated from skill',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-            required: [],
-          },
+          inputSchema: { type: 'object', properties: {}, required: [] },
         },
       ];
     }
@@ -54,11 +42,20 @@ export class MCPJsonRenderer implements Renderer {
     const jsonPath = join(outputPath, `${skillDir.name}.mcp.json`);
     writeFileSync(jsonPath, this.render(skill), 'utf-8');
 
+    const allCopied: string[] = [];
+    const allSkipped: string[] = [];
+
+    if (skill.metadata.attachedFiles && skill.metadata.attachedFiles.length > 0) {
+      const result = copyAttachedFiles(skill.metadata.attachedFiles, outputPath);
+      allCopied.push(...result.copied);
+      allSkipped.push(...result.skipped);
+    }
+
     return {
       skillName: skill.name,
       mainOutput: jsonPath,
-      copiedFiles: [],
-      skippedFiles: [],
+      copiedFiles: allCopied,
+      skippedFiles: allSkipped,
     };
   }
 }

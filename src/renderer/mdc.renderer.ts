@@ -1,15 +1,10 @@
 import { join } from 'node:path';
-import { writeFileSync, cpSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import matter from 'gray-matter';
 import type { Renderer } from './renderer.interface.js';
 import type { FormatType, IntermediateSkill, SkillDirectory, DirectoryConversionResult } from '../core/types.js';
+import { copyAttachedFiles, copyDirectoryTree } from '../utils/file-copier.js';
 
-/**
- * Renders IntermediateSkill to .mdc format (Cursor 2.3+).
- *
- * .mdc files have YAML frontmatter with description, globs, and alwaysApply.
- * The body contains the rule instructions.
- */
 export class MdcRenderer implements Renderer {
   readonly format: FormatType = '.mdc';
   readonly extension = '.mdc';
@@ -35,30 +30,28 @@ export class MdcRenderer implements Renderer {
     skill: IntermediateSkill,
     outputPath: string,
   ): DirectoryConversionResult {
-    const copied: string[] = [];
-    const skipped: string[] = [];
+    const allCopied: string[] = [];
+    const allSkipped: string[] = [];
 
     const mdcPath = join(outputPath, `${skillDir.name}.mdc`);
     writeFileSync(mdcPath, this.render(skill), 'utf-8');
 
-    if (skillDir.scriptsDir) {
-      const target = join(outputPath, 'scripts');
-      if (!existsSync(target)) {
-        mkdirSync(target, { recursive: true });
-      }
-      try {
-        cpSync(skillDir.scriptsDir, target, { recursive: true });
-        copied.push(target);
-      } catch {
-        skipped.push(skillDir.scriptsDir);
+    if (skill.metadata.attachedFiles && skill.metadata.attachedFiles.length > 0) {
+      const result = copyAttachedFiles(skill.metadata.attachedFiles, outputPath);
+      allCopied.push(...result.copied);
+      allSkipped.push(...result.skipped);
+    } else {
+      if (skillDir.scriptsDir) {
+        const target = join(outputPath, 'scripts');
+        allCopied.push(...copyDirectoryTree(skillDir.scriptsDir, target));
       }
     }
 
     return {
       skillName: skill.name,
       mainOutput: mdcPath,
-      copiedFiles: copied,
-      skippedFiles: skipped,
+      copiedFiles: allCopied,
+      skippedFiles: allSkipped,
     };
   }
 }
