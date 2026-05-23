@@ -1,45 +1,45 @@
-# TransSkill Examples
+# TransSkill 示例
 
-> [中文示例](README.zh.md)
+> [English Examples](README.md)
 
-This directory contains usage examples for TransSkill.
+本目录包含 TransSkill 的使用示例。
 
-## File conversion
+## 文件转换
 
 ### .cursorrules → SKILL.md
 
 ```bash
-# Convert your Cursor rules to a portable SKILL.md
+# 将 Cursor 规则转换为可移植的 SKILL.md
 transskill convert .cursorrules --to skill.md -o portable-skill.md
 ```
 
 ### SKILL.md → .cursorrules
 
 ```bash
-# Convert a SKILL.md to Cursor rules
+# 将 SKILL.md 转换为 Cursor 规则
 transskill convert my-skill.skill.md --to .cursorrules -o .cursorrules
 ```
 
-### SKILL.md → .mdc (with file scoping)
+### SKILL.md → .mdc（带文件范围）
 
 ```bash
-# Generate a Cursor 2.3+ rule scoped to TypeScript files
+# 生成限定 TypeScript 文件的 Cursor 2.3+ 规则
 transskill convert my-skill.skill.md --to .mdc --glob "src/**/*.ts"
 ```
 
-## Directory conversion
+## 目录转换
 
 ```bash
-# Full skill directory → Cursor rules
+# 完整 skill 目录 → Cursor 规则
 transskill convert ./weather-skill/ --to .cursorrules
 ```
 
-## GitHub source
+## GitHub 源
 
 ```bash
-# From GitHub shorthand
+# GitHub 缩写格式
 transskill convert gh:user/weather-skill --to skill.md
 
-# With install
+# 直接安装
 transskill convert gh:user/weather-skill --to .cursorrules --install-to .cursor/rules/
 ```
