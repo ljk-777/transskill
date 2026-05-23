@@ -42,20 +42,22 @@ export function detectFormatFromPath(localPath: string): FormatDetectionResult {
   }
 
   if (ext === '.md') {
-    // Check if it's SOUL.md by filename
     const baseName = localPath.split('/').pop() || localPath.split('\\').pop() || '';
-    if (baseName === 'SOUL.md') {
-      return { format: 'soul.md', isDirectory: false };
+
+    // Check by filename
+    if (baseName === 'SOUL.md') return { format: 'soul.md', isDirectory: false };
+    if (baseName.toLowerCase() === 'claude.md' || baseName.endsWith('.claude.md')) {
+      return { format: 'claude.md', isDirectory: false };
     }
-    // Check content for SOUL.md signature
+
+    // Check content for signatures
     try {
       const content = readFileSync(localPath, 'utf-8');
       const firstLine = content.split('\n')[0]?.trim() || '';
-      if (/^#\s+SOUL\.md/i.test(firstLine)) {
-        return { format: 'soul.md', isDirectory: false };
-      }
+      if (/^#\s+SOUL\.md/i.test(firstLine)) return { format: 'soul.md', isDirectory: false };
+      if (/^#\s+CLAUDE\.md/i.test(firstLine)) return { format: 'claude.md', isDirectory: false };
     } catch {
-      // fall through to default
+      // fall through
     }
     return { format: 'skill.md', isDirectory: false };
   }

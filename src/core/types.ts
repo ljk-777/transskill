@@ -6,7 +6,8 @@ export type FormatType =
   | 'mcp.json'
   | 'soul.md'
   | 'agents.md'
-  | 'windsurfrules';
+  | 'windsurfrules'
+  | 'claude.md';
 
 /** User's original input source */
 export type InputSource =
@@ -72,6 +73,11 @@ export interface CursorSpecific {
 
 /** Claude Code-specific configuration */
 export interface ClaudeSpecific {
+  /** CLAUDE.md sections detected */
+  sections?: string[];
+  /** Whether the file references auto memory */
+  autoMemory?: boolean;
+  /** Claude Code specific settings */
   disableModelInvocation?: boolean;
   manualOnly?: boolean;
 }
