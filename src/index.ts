@@ -11,6 +11,8 @@ import { registerRenderer, SKILLMdRenderer, CursorRulesRenderer, MdcRenderer, MC
 import { registerAuditor } from './audit/auditor-registry.js';
 import { InstructionScanner } from './audit/scanner/instruction-scanner.js';
 import { PermissionScanner } from './audit/scanner/permission-scanner.js';
+import { DirectoryScanner } from './audit/scanner/directory-scanner.js';
+import { MCPScanner } from './audit/scanner/mcp-scanner.js';
 import { AuditEngine } from './audit/index.js';
 import { detectFormatFromPath } from './utils/format-detector.js';
 import { writeOutput, ensureDir, displayPath } from './utils/file-utils.js';
@@ -49,6 +51,8 @@ registerRenderer(new ClaudeMDRenderer());
 
 registerAuditor(new InstructionScanner());
 registerAuditor(new PermissionScanner());
+registerAuditor(new DirectoryScanner());
+registerAuditor(new MCPScanner());
 
 // ============================================================
 // CLI
@@ -249,6 +253,16 @@ program
     console.log(`   Parsers:  ${getRegisteredFormats().join(', ')}`);
     console.log(`   Renderers: ${getRegisteredRenderers().map((r) => r.format).join(', ')}`);
     console.log('');
+    console.log('   🔒 Security audit:');
+    console.log('     transskill audit <file|dir> [options]');
+    console.log('     Scan skill files for security issues (L1: instructions, L2: permissions, L3: MCP)');
+    console.log('');
+    console.log('   Audit options:');
+    console.log('     --format <type>    Output format: console | json');
+    console.log('     --quiet            Only show summary score');
+    console.log('     --min-severity     Minimum severity: info | low | medium | high | critical');
+    console.log('     --auditor <id>     Run specific auditor only');
+    console.log('');
   });
 
 program
@@ -416,8 +430,9 @@ program
         auditors: options.auditor,
       });
 
-      const filePath = isDirectory ? resolved.localPath : resolved.localPath;
-      const report = engine.auditSkill(skill, filePath, input);
+      const report = isDirectory
+        ? engine.auditDirectory(skill, resolved.localPath, resolved.localPath, input)
+        : engine.auditSkill(skill, resolved.localPath, input);
 
       // Output
       if (options.format === 'json') {

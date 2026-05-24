@@ -9,6 +9,7 @@ import { computeScore, SEVERITY_ORDER } from './auditor.interface.js';
 import { getAuditors } from './auditor-registry.js';
 import type { FormatType, IntermediateSkill } from '../core/types.js';
 import { renderConsoleReport } from './reporter/console-reporter.js';
+import { DirectoryScanner } from './scanner/directory-scanner.js';
 
 /**
  * AuditEngine — the main entry point for security auditing.
@@ -59,6 +60,47 @@ export class AuditEngine {
     }
 
     return this.buildReport(findings, target ?? filePath, skill.metadata.sourceFormat, false);
+  }
+
+  /**
+   * Audit a skill directory, including file-level and directory-level checks.
+   */
+  auditDirectory(
+    skill: IntermediateSkill,
+    rootPath: string,
+    skillFilePath: string,
+    target?: string,
+  ): AuditReport {
+    const auditors = this.resolveAuditors(skill.metadata.sourceFormat);
+    const findings: AuditFinding[] = [];
+
+    // Run all applicable auditors on the parsed skill
+    for (const auditor of auditors) {
+      try {
+        const result = auditor.audit(skill, skillFilePath);
+        findings.push(...result);
+      } catch (err) {
+        findings.push({
+          id: 'ERR',
+          severity: 'info',
+          title: `Auditor "${auditor.id}" 执行出错`,
+          description: String(err),
+          filePath: skillFilePath,
+          recommendation: '检查 auditor 实现是否正确',
+        });
+      }
+    }
+
+    // Run directory-specific scanner
+    const dirScanner = new DirectoryScanner();
+    try {
+      const dirFindings = dirScanner.auditDirectory(rootPath, skillFilePath);
+      findings.push(...dirFindings);
+    } catch (err) {
+      // Directory scan is best-effort
+    }
+
+    return this.buildReport(findings, target ?? rootPath, skill.metadata.sourceFormat, true);
   }
 
   /**
