@@ -8,7 +8,7 @@
 |:---|:-----|:------:|:---------|:--------:|:----:|
 | AUDIT-i18n-001 | ~~文字混排~~：`t()` 新增 4 级匹配策略（精确→引用后缀→引用前缀→冒号前缀），变量拼接字符串也能正确翻译 | medium | `transskill audit --lang en` | 2026-05-24 | ✅ v0.2.6 |
 | AUDIT-i18n-002 | ~~语言检测不准~~：`isChinese()` 已删，改为直接使用 `--lang` 选项 | low | `transskill audit` | 2026-05-24 | ✅ v0.2.5 |
-| AUDIT-SCOPE-003 | **扫描范围越界**：对单文件执行 `transskill audit test.md` 时，额外输出了其他目录（`sus-skill/`）的发现，路径解析或扫描范围有问题 | high | `transskill audit <file>` | 2026-05-24 | ⏳ 待修复 |
+| AUDIT-SCOPE-003 | ~~扫描范围越界~~：`auditSkill()` 跳过 `supportsDirectory: true` 的 auditor，DirectoryScanner 只在目录模式下运行 | high | `transskill audit <file>` | 2026-05-24 | ✅ v0.2.7 |
 | CLI-OUTPUT-004 | **其他界面输出仍用旧风格 emoji**：`list-formats`（📦）、`convert`（✅❌⚠️）、`diff`（✅❌）、`validate`（✅❌）等命令的输出仍使用 emoji 装饰，与 audit 新风格不统一 | medium | `transskill convert / diff / list-formats / validate` | 2026-05-24 | ⏳ 待修复 |
 
 ## 严重度定义

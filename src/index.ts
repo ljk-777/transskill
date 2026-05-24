@@ -105,7 +105,7 @@ program
 
       if (options.dryRun) {
         console.log(`\n${'─'.repeat(40)}`);
-        console.log(`🔍 DRY RUN - no files will be written`);
+        console.log(`DRY RUN - no files will be written`);
         console.log(`${'─'.repeat(40)}`);
         console.log(`  Pipeline:    ${sourceFormat} → ${targetFormat}`);
         console.log(`  Input:       ${input}`);
@@ -115,7 +115,7 @@ program
         if (options.glob) console.log(`  Glob:        ${options.glob}`);
         if (options.alwaysApply) console.log(`  Always apply: yes`);
         console.log(`${'─'.repeat(40)}\n`);
-        console.log('✅ Dry-run complete. Remove --dry-run to execute.\n');
+        console.log('Dry-run complete. Remove --dry-run to execute.\n');
 
         if (resolved.cleanup) await resolved.cleanup();
         return;
@@ -155,26 +155,26 @@ program
         if (renderer.renderDirectory) {
           const result = renderer.renderDirectory(skillDir, mapped, cwd);
           console.log(`\n${'─'.repeat(40)}`);
-          console.log('✅ Directory conversion complete');
+          console.log('Directory conversion complete');
           console.log(`  Main:        ${displayPath(result.mainOutput)}`);
           for (const copied of result.copiedFiles) {
             console.log(`  Copied:      ${displayPath(copied)}`);
           }
           for (const skipped of result.skippedFiles) {
-            console.log(`  ⚠️  Skipped:   ${displayPath(skipped)}`);
+            console.log(`  Skipped:   ${displayPath(skipped)}`);
           }
         } else {
           // Fallback: single file output for directory input
           const outPath = join(cwd, `${skillDir.name}${renderer.extension}`);
           writeOutput(outPath, renderer.render(mapped));
-          console.log(`\n✅ Converted: ${displayPath(outPath)}`);
+          console.log(`\nConverted: ${displayPath(outPath)}`);
         }
 
         // Show report
         if (report.warnings.length > 0) {
           console.log('');
           for (const w of report.warnings) {
-            console.log(`  ⚠️  ${w}`);
+            console.log(`  Warning: ${w}`);
           }
         }
         if (options.verbose && report.lost.length > 0) {
@@ -205,13 +205,13 @@ program
         writeOutput(outPath, rendered);
 
         console.log(`\n${'─'.repeat(40)}`);
-        console.log('✅ Conversion complete');
+        console.log('Conversion complete');
         console.log(`  Output:      ${displayPath(outPath)}`);
 
         if (report.warnings.length > 0) {
           console.log('');
           for (const w of report.warnings) {
-            console.log(`  ⚠️  ${w}`);
+            console.log(`  Warning: ${w}`);
           }
         }
         if (options.verbose && report.lost.length > 0) {
@@ -225,7 +225,7 @@ program
       if (resolved.cleanup) await resolved.cleanup();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`\n❌ Error: ${message}\n`);
+      console.error(`\nError: ${message}\n`);
       process.exit(1);
     }
   });
@@ -234,7 +234,7 @@ program
   .command('list-formats')
   .description('List all supported input/output formats')
   .action(() => {
-    console.log('\n📦 Supported formats:\n');
+    console.log('\nSupported formats:\n');
     console.log('   Input → Output');
     console.log('   ────────────────');
     console.log('   SKILL.md    → .cursorrules, .mdc');
@@ -253,7 +253,7 @@ program
     console.log(`   Parsers:  ${getRegisteredFormats().join(', ')}`);
     console.log(`   Renderers: ${getRegisteredRenderers().map((r) => r.format).join(', ')}`);
     console.log('');
-    console.log('   🔒 Security audit:');
+    console.log('   Security audit:');
     console.log('     transskill audit <file|dir> [options]');
     console.log('     Scan skill files for security issues (L1: instructions, L2: permissions, L3: MCP)');
     console.log('');
@@ -303,18 +303,18 @@ program
 
       console.log('');
       console.log(`  ${'─'.repeat(50)}`);
-      console.log(`  📋  Conversion Impact Report`);
+      console.log(`  Conversion Impact Report`);
       console.log(`  ${'─'.repeat(50)}`);
       console.log(`  ${sourceFormat}${isDirectory ? ' (directory)' : ''}`);
-      console.log(`  ${'↓'.padStart(25)}`);
+      console.log(`  →`);
       console.log(`  ${targetFormat}`);
       console.log(`  ${'─'.repeat(50)}`);
-      console.log(`  ✅ Preserved: ${report.preserved.length > 0 ? report.preserved.join(', ') : '(nothing specific)'}`);
-      console.log(`  ❌ Lost:      ${report.lost.length > 0 ? report.lost.join(', ') : '(none)'}`);
+      console.log(`  Preserved: ${report.preserved.length > 0 ? report.preserved.join(', ') : '(nothing specific)'}`);
+      console.log(`  Lost:      ${report.lost.length > 0 ? report.lost.join(', ') : '(none)'}`);
       console.log('');
 
       if (report.warnings.length > 0) {
-        console.log('  ⚠️  Warnings:');
+        console.log('  Warnings:');
         for (const w of report.warnings) {
           console.log(`     • ${w}`);
         }
@@ -325,10 +325,10 @@ program
       if (skill.metadata.attachedFiles && skill.metadata.attachedFiles.length > 0) {
         const count = skill.metadata.attachedFiles.length;
         if (targetFormat === '.cursorrules') {
-          console.log(`  📁 ${count} attached file(s) will be copied alongside the output`);
+          console.log(`   ${count} attached file(s) will be copied alongside the output`);
           console.log(`     (scripts, references, assets are preserved as sidecar files)`);
         } else {
-          console.log(`  📁 ${count} attached file(s) will be preserved`);
+          console.log(`   ${count} attached file(s) will be preserved`);
         }
         console.log('');
       }
@@ -340,7 +340,7 @@ program
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`
-❌ Diff failed: ${message}
+Error: Diff failed: ${message}
 `);
       process.exit(1);
     }
@@ -352,7 +352,7 @@ program
   .option('-f, --format <format>', 'Specify input format (auto-detected if omitted)')
   .action(async (input, _options) => {
     try {
-      console.log(`\n🔍 Validating: ${input}`);
+      console.log(`\nValidating: ${input}`);
 
       const resolved = await resolveInput(input);
       console.log(`  Resolved:    ${resolved.localPath}`);
@@ -379,12 +379,12 @@ program
         }
       }
 
-      console.log('\n✅ Validation passed - input looks valid.\n');
+      console.log('\nValidation passed.\n');
 
       if (resolved.cleanup) await resolved.cleanup();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`\n❌ Validation failed: ${message}\n`);
+      console.error(`\nError: Validation failed: ${message}\n`);
       process.exit(1);
     }
   });
@@ -449,7 +449,7 @@ program
       if (resolved.cleanup) await resolved.cleanup();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`\n❌ Audit failed: ${message}\n`);
+      console.error(`\nError: Audit failed: ${message}\n`);
       process.exit(1);
     }
   });
