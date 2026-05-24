@@ -18,8 +18,9 @@ export class MdcRenderer implements Renderer {
     if (cursor?.globs && cursor.globs.length > 0) {
       frontmatter.globs = cursor.globs.length === 1 ? cursor.globs[0] : cursor.globs.join(', ');
     }
-    if (cursor?.alwaysApply !== undefined) {
-      frontmatter.alwaysApply = cursor.alwaysApply;
+    // Only emit alwaysApply when true — false is the Cursor default
+    if (cursor?.alwaysApply === true) {
+      frontmatter.alwaysApply = true;
     }
 
     return matter.stringify(skill.instructions || '', frontmatter);

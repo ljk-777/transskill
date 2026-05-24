@@ -8,6 +8,11 @@ import { TransSkillError } from '../core/errors.js';
  *
  * .cursorrules is a plain text file with instructions for Cursor IDE.
  * It has no frontmatter — the entire content is treated as instructions.
+ *
+ * Convention: first line may be an optional `# Title` heading.
+ *   - If present, it's used as the description and stripped from instructions.
+ *   - If absent, a fallback description is generated from the filename.
+ *
  * Used by: Cursor IDE (legacy format)
  */
 export class CursorRulesParser implements Parser {
@@ -18,21 +23,40 @@ export class CursorRulesParser implements Parser {
   }
 
   parse(content: string, filePath?: string): IntermediateSkill {
-    const instructions = content.trim();
+    const trimmed = content.trim();
 
     // Derive name from filename (or parent directory)
     const name = filePath
       ? basename(filePath, extname(filePath))
       : 'untitled-rules';
 
-    // Extract first meaningful line as description
-    const firstLine = instructions.split('\n')[0]?.replace(/^[#\s]*/, '').trim() || '';
-    const description = firstLine.length > 0 ? firstLine : `Cursor rules from ${name}`;
+    const lines = trimmed.split('\n');
+    const firstRaw = lines[0] ?? '';
 
+    // Detect whether the first line looks like a markdown heading
+    const headingMatch = firstRaw.match(/^#+\s+(.+)/);
+    if (headingMatch) {
+      // Title line: use as description, strip from instructions
+      const description = headingMatch[1].trim();
+      const instructions = lines.slice(1).join('\n').trim();
+      return {
+        name,
+        description,
+        instructions,
+        metadata: {
+          sourceFormat: '.cursorrules',
+        },
+        platformSpecific: {},
+      };
+    }
+
+    // No heading found — treat everything as instructions.
+    // Derive a sensible fallback description from the filename.
+    const description = `Cursor rules for ${name}`;
     return {
       name,
       description,
-      instructions,
+      instructions: trimmed,
       metadata: {
         sourceFormat: '.cursorrules',
       },

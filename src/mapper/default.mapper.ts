@@ -62,9 +62,9 @@ export class DefaultMapper implements Mapper {
       }
 
       case '.mdc': {
-        // Ensure cursor-specific fields exist
+        // Ensure cursor-specific fields exist (no default alwaysApply)
         if (!result.platformSpecific.cursor) {
-          result.platformSpecific.cursor = { alwaysApply: false };
+          result.platformSpecific.cursor = {};
         }
 
         // Transfer attached files info if available

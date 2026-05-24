@@ -8,6 +8,10 @@ import { registerResolver, LocalResolver, GitHubResolver, resolveInput } from '.
 import { registerParser, SKILLMdParser, CursorRulesParser, MdcParser, MCPJsonParser, SOULMdParser, ClaudeMDParser, getRegisteredFormats } from './parser/index.js';
 import { DefaultMapper } from './mapper/index.js';
 import { registerRenderer, SKILLMdRenderer, CursorRulesRenderer, MdcRenderer, MCPJsonRenderer, ClaudeMDRenderer, getRegisteredRenderers } from './renderer/index.js';
+import { registerAuditor } from './audit/auditor-registry.js';
+import { InstructionScanner } from './audit/scanner/instruction-scanner.js';
+import { PermissionScanner } from './audit/scanner/permission-scanner.js';
+import { AuditEngine } from './audit/index.js';
 import { detectFormatFromPath } from './utils/format-detector.js';
 import { writeOutput, ensureDir, displayPath } from './utils/file-utils.js';
 import { scanSkillDirectory, skillDirToAttachedFiles } from './utils/directory-scanner.js';
@@ -38,6 +42,13 @@ registerRenderer(new CursorRulesRenderer());
 registerRenderer(new MdcRenderer());
 registerRenderer(new MCPJsonRenderer());
 registerRenderer(new ClaudeMDRenderer());
+
+// ============================================================
+// Register auditors
+// ============================================================
+
+registerAuditor(new InstructionScanner());
+registerAuditor(new PermissionScanner());
 
 // ============================================================
 // CLI
@@ -360,6 +371,69 @@ program
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`\n❌ Validation failed: ${message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('audit <input>')
+  .description('Security audit a skill file or directory')
+  .option('--min-severity <level>', 'Minimum severity to report (info, low, medium, high, critical)', 'info')
+  .option('--auditor <id>', 'Run specific auditor only (can be repeated)', (val: string, acc: string[]) => { acc.push(val); return acc; }, [])
+  .option('--format <type>', 'Output format: console or json', 'console')
+  .option('--quiet', 'Only show summary score')
+  .option('-v, --verbose', 'Show detailed findings')
+  .action(async (input, options) => {
+    try {
+      const resolved = await resolveInput(input);
+      const { detectFormatFromPath } = await import('./utils/format-detector.js');
+      const { readInput } = await import('./utils/file-utils.js');
+      const { getParser } = await import('./parser/parser-registry.js');
+
+      const { format: sourceFormat, isDirectory } = detectFormatFromPath(resolved.localPath);
+
+      // Parse skill
+      let skill;
+      const parser = getParser(sourceFormat);
+      if (isDirectory) {
+        const { scanSkillDirectory, skillDirToAttachedFiles } = await import('./utils/directory-scanner.js');
+        const skillDir = scanSkillDirectory(resolved.localPath);
+        const content = readInput(skillDir.skillFile);
+        skill = parser.parse(content, skillDir.skillFile);
+        const attached = skillDirToAttachedFiles(skillDir);
+        if (attached.length > 0) skill.metadata.attachedFiles = attached;
+      } else {
+        const content = readInput(resolved.localPath);
+        skill = parser.parse(content, resolved.localPath);
+      }
+
+      // Run audit
+      const severityMap: Record<string, any> = {
+        info: 'info', low: 'low', medium: 'medium', high: 'high', critical: 'critical',
+      };
+      const engine = new AuditEngine({
+        minSeverity: severityMap[options.minSeverity] || 'info',
+        auditors: options.auditor,
+      });
+
+      const filePath = isDirectory ? resolved.localPath : resolved.localPath;
+      const report = engine.auditSkill(skill, filePath, input);
+
+      // Output
+      if (options.format === 'json') {
+        console.log(engine.reportToJson(report));
+      } else if (options.quiet) {
+        const score = report.score;
+        console.log(`📊 ${score.level} (${score.total}/100) — ${report.findings.length} findings (${score.critical}🔴 ${score.high}🟠 ${score.medium}🟡 ${score.low}🟢)`);
+        console.log(`   ${report.summary}`);
+      } else {
+        console.log(engine.reportToString(report));
+      }
+
+      if (resolved.cleanup) await resolved.cleanup();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`\n❌ Audit failed: ${message}\n`);
       process.exit(1);
     }
   });
