@@ -1,6 +1,6 @@
 {
   "name": "transskill",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Cross-platform AI agent skill converter - Write once, run on any agent",
   "bin": {
     "transskill": "dist/index.js"
