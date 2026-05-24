@@ -6,20 +6,12 @@ export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
 export const SEVERITY_ORDER: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
-export const SEVERITY_WEIGHTS: Record<Severity, number> = {
-  critical: 25,
-  high: 10,
-  medium: 4,
-  low: 1,
-  info: 0,
-};
-
 export const SEVERITY_LABELS: Record<Severity, string> = {
-  critical: '🔴 Critical',
-  high: '🟠 High',
-  medium: '🟡 Medium',
-  low: '🟢 Low',
-  info: 'ℹ️ Info',
+  critical: 'CRIT',
+  high: 'HIGH',
+  medium: 'MED',
+  low: 'LOW',
+  info: 'INFO',
 };
 
 // ── Finding ──
@@ -36,45 +28,6 @@ export interface AuditFinding {
   cwe?: string;
 }
 
-// ── Score ──
-
-export type ScoreLevel = 'A' | 'B' | 'C' | 'D' | 'F';
-
-export interface SecurityScore {
-  total: number; // 0-100
-  level: ScoreLevel;
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-  info: number;
-}
-
-export function computeScore(
-  critical: number,
-  high: number,
-  medium: number,
-  low: number,
-  _info: number,
-): SecurityScore {
-  const raw =
-    100 -
-    critical * SEVERITY_WEIGHTS.critical -
-    high * SEVERITY_WEIGHTS.high -
-    medium * SEVERITY_WEIGHTS.medium -
-    low * SEVERITY_WEIGHTS.low;
-  const total = Math.max(0, Math.min(100, raw));
-
-  let level: ScoreLevel;
-  if (total >= 90) level = 'A';
-  else if (total >= 70) level = 'B';
-  else if (total >= 50) level = 'C';
-  else if (total >= 30) level = 'D';
-  else level = 'F';
-
-  return { total, level, critical, high, medium, low, info: _info };
-}
-
 // ── Report ──
 
 export interface AuditReport {
@@ -82,8 +35,7 @@ export interface AuditReport {
   format: FormatType;
   isDirectory: boolean;
   findings: AuditFinding[];
-  score: SecurityScore;
-  summary: string;
+  severityCounts: Record<Severity, number>;
   timestamp: string; // ISO 8601
 }
 

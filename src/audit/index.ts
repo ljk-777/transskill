@@ -5,7 +5,7 @@ import type {
   AuditOptions,
   Severity,
 } from './auditor.interface.js';
-import { computeScore, SEVERITY_ORDER } from './auditor.interface.js';
+import { SEVERITY_ORDER } from './auditor.interface.js';
 import { getAuditors } from './auditor-registry.js';
 import type { FormatType, IntermediateSkill } from '../core/types.js';
 import { renderConsoleReport } from './reporter/console-reporter.js';
@@ -167,36 +167,12 @@ export class AuditEngine {
       counts[f.severity]++;
     }
 
-    const score = computeScore(
-      counts.critical,
-      counts.high,
-      counts.medium,
-      counts.low,
-      counts.info,
-    );
-
-    // Generate summary
-    const parts: string[] = [];
-    if (filtered.length === 0) {
-      parts.push('未发现安全问题，请继续保持');
-    } else {
-      if (counts.critical > 0) parts.push(`发现 ${counts.critical} 个严重问题`);
-      if (counts.high > 0) parts.push(`发现 ${counts.high} 个高危问题`);
-      if (counts.medium > 0) parts.push(`发现 ${counts.medium} 个中危问题`);
-      if (filtered.length > 0) parts.push(`共 ${filtered.length} 项发现`);
-    }
-
-    const hasIssues = counts.critical > 0 || counts.high > 0 || counts.medium > 0;
-
     return {
       target,
       format,
       isDirectory,
       findings: filtered,
-      score,
-      summary: hasIssues
-        ? `存在安全风险 (${score.level}级/${score.total}分) — ${parts.join('; ')}`
-        : `安全 (${score.level}级/${score.total}分) — ${parts.join('; ')}`,
+      severityCounts: counts,
       timestamp: new Date().toISOString(),
     };
   }

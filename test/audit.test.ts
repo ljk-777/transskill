@@ -4,7 +4,7 @@ import { InstructionScanner } from '../src/audit/scanner/instruction-scanner.js'
 import { PermissionScanner } from '../src/audit/scanner/permission-scanner.js';
 import { registerAuditor, getAuditors, clearAuditors } from '../src/audit/auditor-registry.js';
 import type { IntermediateSkill, FormatType } from '../src/core/types.js';
-import { computeScore } from '../src/audit/auditor.interface.js';
+
 
 describe('AuditEngine — basic flow', () => {
   beforeAll(() => {
@@ -28,8 +28,8 @@ describe('AuditEngine — basic flow', () => {
     const report = engine.auditSkill(skill, 'safe.skill.md');
 
     expect(report.findings).toHaveLength(0);
-    expect(report.score.level).toBe('A');
-    expect(report.score.total).toBe(100);
+    expect(report.severityCounts.critical).toBe(0);
+    expect(report.severityCounts.high).toBe(0);
   });
 
   it('detects rm -rf dangerous command', () => {
@@ -47,7 +47,7 @@ describe('AuditEngine — basic flow', () => {
     const criticalFindings = report.findings.filter((f) => f.severity === 'critical');
     expect(criticalFindings.length).toBeGreaterThan(0);
     expect(criticalFindings[0].id).toBe('L1-001a');
-    expect(report.score.total).toBeLessThan(100);
+    expect(report.severityCounts.critical).toBeGreaterThan(0);
   });
 
   it('detects curl|sh remote execution pattern', () => {
@@ -177,34 +177,10 @@ describe('AuditEngine — basic flow', () => {
     const json = engine.reportToJson(report);
 
     const parsed = JSON.parse(json);
-    expect(parsed.score).toBeDefined();
+    expect(parsed.severityCounts).toBeDefined();
     expect(parsed.timestamp).toBeDefined();
     expect(parsed.target).toBe('test.skill.md');
   });
 });
 
-describe('computeScore', () => {
-  it('returns A for no findings', () => {
-    const score = computeScore(0, 0, 0, 0, 0);
-    expect(score.total).toBe(100);
-    expect(score.level).toBe('A');
-  });
 
-  it('returns F for critical findings', () => {
-    const score = computeScore(4, 0, 0, 0, 0);
-    expect(score.total).toBe(0);
-    expect(score.level).toBe('F');
-  });
-
-  it('returns B for minor issues', () => {
-    const score = computeScore(0, 0, 2, 3, 0);
-    expect(score.total).toBe(89);
-    expect(score.level).toBe('B');
-  });
-
-  it('does not go below 0', () => {
-    const score = computeScore(10, 0, 0, 0, 0);
-    expect(score.total).toBe(0);
-    expect(score.level).toBe('F');
-  });
-});

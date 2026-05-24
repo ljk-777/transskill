@@ -438,9 +438,8 @@ program
       if (options.format === 'json') {
         console.log(engine.reportToJson(report));
       } else if (options.quiet) {
-        const score = report.score;
-        console.log(`📊 ${score.level} (${score.total}/100) — ${report.findings.length} findings (${score.critical}🔴 ${score.high}🟠 ${score.medium}🟡 ${score.low}🟢)`);
-        console.log(`   ${report.summary}`);
+        const c = report.severityCounts;
+        console.log(`${report.findings.length} findings (${c.critical} crit, ${c.high} high, ${c.medium} med, ${c.low} low)`);
       } else {
         console.log(engine.reportToString(report));
       }
