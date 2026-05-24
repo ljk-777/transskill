@@ -73,6 +73,11 @@ const ZH_TO_EN: Record<string, string> = {
   '描述中包含可疑关键词': ' description contains suspicious keywords',
   'Tool shadowing': 'Tool shadowing',
   '引用了其他 tool': ' references another tool',
+  ' 描述中包含 prompt 注入': ' description contains prompt injection',
+  ' 描述中包含可疑关键词': ' description contains suspicious keywords',
+  ' 可能暴露 agent 于不可信内容': ' may expose agent to untrusted content',
+  ' 访问敏感数据领域': ' accesses sensitive data domain',
+  ' 可能具有破坏性能力': ' may have destructive capabilities',
   '的描述中提到了其他 tool': "'s description references another tool",
   '这可能是一个 tool shadowing 攻击，恶意 server 试图覆盖或干扰另一工具的决策': 'This may be a tool shadowing attack; a malicious server may be trying to override another tool\'s decisions',
   '可能暴露 agent 于不可信内容': ' may expose agent to untrusted content',
@@ -98,8 +103,44 @@ const ZH_TO_EN: Record<string, string> = {
 /**
  * Translate a Chinese string to English if a translation exists.
  * Falls back to the original string if no translation is found.
+ * Handles suffixes like `: some_path` by matching the prefix.
  */
 export function t(zh: string, lang: string): string {
   if (lang === 'zh' || lang === 'zh-CN') return zh;
-  return ZH_TO_EN[zh] ?? zh;
+
+  // 1) Try exact match
+  if (ZH_TO_EN[zh]) return ZH_TO_EN[zh];
+
+  // 2) Try suffix after last `"` (handles template `prefix "VAR" suffix` before
+  //    `: ` ones because colon-based patterns might also contain quoted vars)
+  const lastQuote = zh.lastIndexOf('"');
+  if (lastQuote > 0 && lastQuote < zh.length - 1) {
+    const rawSuffix = zh.slice(lastQuote + 1);
+    const suffix = rawSuffix.trim();
+    const leading = rawSuffix.length - suffix.length;
+    const varPart = zh.slice(0, lastQuote + 1) + ' '.repeat(leading);
+    if (ZH_TO_EN[suffix]) {
+      return varPart + ZH_TO_EN[suffix];
+    }
+  }
+
+  // 3) Try prefix before first `"` (handles `MCP tool "xxx" 描述...` patterns)
+  const quoteIdx = zh.indexOf('"');
+  if (quoteIdx > 0) {
+    const prefix = zh.slice(0, quoteIdx);
+    if (ZH_TO_EN[prefix]) {
+      return ZH_TO_EN[prefix] + zh.slice(quoteIdx);
+    }
+  }
+
+  // 4) Try prefix before `: ` (handles file path suffixes like `: .env`)
+  const colonIdx = zh.indexOf(': ');
+  if (colonIdx > 0) {
+    const prefix = zh.slice(0, colonIdx);
+    if (ZH_TO_EN[prefix]) {
+      return ZH_TO_EN[prefix] + zh.slice(colonIdx);
+    }
+  }
+
+  return zh;
 }
