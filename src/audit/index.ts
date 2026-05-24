@@ -185,6 +185,7 @@ export class AuditEngine {
       isDirectory,
       findings: translated,
       severityCounts: counts,
+      lang,
       timestamp: new Date().toISOString(),
     };
   }

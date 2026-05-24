@@ -180,6 +180,7 @@ describe('AuditEngine — basic flow', () => {
     expect(parsed.severityCounts).toBeDefined();
     expect(parsed.timestamp).toBeDefined();
     expect(parsed.target).toBe('test.skill.md');
+    expect(parsed.lang).toBe('en');
   });
 });
 

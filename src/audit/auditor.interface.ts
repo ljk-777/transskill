@@ -36,6 +36,7 @@ export interface AuditReport {
   isDirectory: boolean;
   findings: AuditFinding[];
   severityCounts: Record<Severity, number>;
+  lang: string;
   timestamp: string; // ISO 8601
 }
 
