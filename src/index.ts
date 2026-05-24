@@ -454,4 +454,18 @@ program
     }
   });
 
+program
+  .command('info <name>')
+  .description('Show detailed info about a skill from the registry')
+  .action(async (name) => {
+    try {
+      const { showSkillInfo } = await import('./marketplace/info.js');
+      await showSkillInfo(name);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`\nError: ${message}\n`);
+      process.exit(1);
+    }
+  });
+
 program.parse();
