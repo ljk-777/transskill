@@ -397,6 +397,7 @@ program
   .option('--format <type>', 'Output format: console or json', 'console')
   .option('--quiet', 'Only show summary score')
   .option('-v, --verbose', 'Show detailed findings')
+  .option('--lang <lang>', 'Output language: en or zh', 'en')
   .action(async (input, options) => {
     try {
       const resolved = await resolveInput(input);
@@ -428,6 +429,7 @@ program
       const engine = new AuditEngine({
         minSeverity: severityMap[options.minSeverity] || 'info',
         auditors: options.auditor,
+        lang: options.lang || 'en',
       });
 
       const report = isDirectory

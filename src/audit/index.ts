@@ -10,6 +10,7 @@ import { getAuditors } from './auditor-registry.js';
 import type { FormatType, IntermediateSkill } from '../core/types.js';
 import { renderConsoleReport } from './reporter/console-reporter.js';
 import { DirectoryScanner } from './scanner/directory-scanner.js';
+import { t } from './locale.js';
 
 /**
  * AuditEngine — the main entry point for security auditing.
@@ -29,6 +30,7 @@ export class AuditEngine {
       minSeverity: options.minSeverity ?? 'info',
       auditors: options.auditors ?? [],
       noDirectory: options.noDirectory ?? false,
+      lang: options.lang ?? 'en',
     };
   }
 
@@ -154,6 +156,8 @@ export class AuditEngine {
     format: FormatType,
     isDirectory: boolean,
   ): AuditReport {
+    const lang = this.options.lang || 'en';
+
     // Apply severity filter
     const minIdx = SEVERITY_ORDER.indexOf(this.options.minSeverity);
     const filtered = findings.filter((f) => {
@@ -161,9 +165,17 @@ export class AuditEngine {
       return idx <= minIdx; // higher severity = lower index
     });
 
+    // Translate findings if needed
+    const translated = lang !== 'zh' ? filtered.map((f) => ({
+      ...f,
+      title: t(f.title, lang),
+      description: t(f.description, lang),
+      recommendation: f.recommendation ? t(f.recommendation, lang) : undefined,
+    })) : filtered;
+
     // Count by severity
     const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-    for (const f of filtered) {
+    for (const f of translated) {
       counts[f.severity]++;
     }
 
@@ -171,7 +183,7 @@ export class AuditEngine {
       target,
       format,
       isDirectory,
-      findings: filtered,
+      findings: translated,
       severityCounts: counts,
       timestamp: new Date().toISOString(),
     };

@@ -65,4 +65,6 @@ export interface AuditOptions {
   auditors?: string[];
   /** Skip directory-level checks */
   noDirectory?: boolean;
+  /** Output language: 'en' or 'zh' */
+  lang?: string;
 }
