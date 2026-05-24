@@ -46,6 +46,9 @@ export class AuditEngine {
     const findings: AuditFinding[] = [];
 
     for (const auditor of auditors) {
+      // Skip directory-only auditors for single-file audits
+      if (auditor.supportsDirectory) continue;
+
       try {
         const result = auditor.audit(skill, filePath);
         findings.push(...result);
@@ -53,10 +56,10 @@ export class AuditEngine {
         findings.push({
           id: 'ERR',
           severity: 'info',
-          title: `Auditor "${auditor.id}" 执行出错`,
+          title: `Auditor "${auditor.id}" execution error`,
           description: String(err),
           filePath,
-          recommendation: '检查 auditor 实现是否正确',
+          recommendation: 'Check auditor implementation for bugs',
         });
       }
     }
