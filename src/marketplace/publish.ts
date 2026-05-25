@@ -27,6 +27,18 @@ const REGISTRY_FULL = `${REGISTRY_OWNER}/${REGISTRY_REPO}`;
 const GITHUB_API = 'https://api.github.com';
 
 // ──────────────────────────────────────────────
+// Error type
+// ──────────────────────────────────────────────
+
+/** Error thrown to abort publish (messages already printed via log/outro). */
+export class PublishError extends Error {
+  constructor(msg?: string) {
+    super(msg || 'Publish aborted');
+    this.name = 'PublishError';
+  }
+}
+
+// ──────────────────────────────────────────────
 // GitHub API helpers
 // ──────────────────────────────────────────────
 
@@ -38,7 +50,7 @@ function getToken(): string {
     log.info('Create a token at https://github.com/settings/tokens');
     log.info('Then set: export GITHUB_TOKEN=ghp_xxx');
     console.error('');
-    process.exit(1);
+    throw new PublishError();
   }
   return token;
 }
@@ -243,7 +255,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
   if (!existsSync(skillDirPath)) {
     log.error(`Path does not exist: ${skillDirPath}`);
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   const stat = statSync(skillDirPath);
@@ -251,7 +263,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     log.error(`Expected a directory, got a file: ${skillDirPath}`);
     log.info('Usage: transskill publish ./my-skill/');
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   // Check for SKILL.md
@@ -260,7 +272,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     log.error(`Directory does not contain SKILL.md: ${skillDirPath}`);
     log.info('A valid skill directory must have a SKILL.md file with frontmatter.');
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   // Step 2: Parse and validate frontmatter
@@ -306,7 +318,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     const message = err instanceof Error ? err.message : String(err);
     log.error(`Invalid skill: ${message}`);
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   // Step 3: Security audit (mandatory)
@@ -328,7 +340,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     log.error(`Audit score ${score}/100 is below the minimum of 90.`);
     log.info('Fix the issues or use --force to publish anyway.');
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   // Dry run — stop here
@@ -358,7 +370,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     const message = err instanceof Error ? err.message : String(err);
     log.error(message);
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   // Step 5: Fork
@@ -371,7 +383,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     const message = err instanceof Error ? err.message : String(err);
     log.error(message);
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   // Step 6: Create branch
@@ -403,7 +415,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     const message = err instanceof Error ? err.message : String(err);
     log.error(message);
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   // Step 7: Upload files
@@ -426,7 +438,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     const message = err instanceof Error ? err.message : String(err);
     log.error(message);
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   // Upload extra files if any (scripts, assets, references, etc.)
@@ -528,7 +540,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     const message = err instanceof Error ? err.message : String(err);
     log.error(message);
     outro('Publish cancelled');
-    process.exit(1);
+    throw new PublishError();
   }
 
   // Step 9: Create PR
@@ -574,7 +586,7 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     const message = err instanceof Error ? err.message : String(err);
     log.error(message);
     outro('Publish failed — files were pushed to the branch but PR could not be created.');
-    process.exit(1);
+    throw new PublishError();
   }
 }
 
@@ -595,4 +607,4 @@ function formatScore(score: number): string {
   if (score >= 90) return chalk.green(`${score}/100`);
   if (score >= 70) return chalk.yellow(`${score}/100`);
   return chalk.red(`${score}/100`);
-}
+}0

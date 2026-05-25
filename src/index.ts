@@ -528,6 +528,30 @@ program
         dryRun: options.dryRun ?? false,
       });
     } catch (err: unknown) {
+      if (err && typeof err === 'object' && (err as Record<string, unknown>).name === 'PublishError') {
+        process.exit(1);
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`\nError: ${message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('publish-all [dir]')
+  .description('Batch publish all skills from a directory to the registry')
+  .option('--force', 'Skip confirmation')
+  .option('--dry-run', 'Audit only, do not publish')
+  .option('--author <name>', 'Default author name for skills missing it', 'anthropic')
+  .action(async (dir, options) => {
+    try {
+      const { publishAllSkills } = await import('./marketplace/publish-all.js');
+      await publishAllSkills(dir || '.', {
+        force: options.force ?? false,
+        dryRun: options.dryRun ?? false,
+        author: options.author,
+      });
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`\nError: ${message}\n`);
       process.exit(1);
