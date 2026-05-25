@@ -468,4 +468,100 @@ program
     }
   });
 
+program
+  .command('search [query]')
+  .description('Interactively search and browse skills from the registry')
+  .option('--refresh', 'Force refresh registry cache')
+  .option('--tag <tag>', 'Filter by tag')
+  .option('--json', 'Output as JSON (non-interactive)')
+  .action(async (query, options) => {
+    try {
+      if (options.json) {
+        const { jsonSearch } = await import('./marketplace/search.js');
+        await jsonSearch({ query, tag: options.tag, refresh: options.refresh });
+      } else {
+        const { interactiveSearch } = await import('./marketplace/search.js');
+        await interactiveSearch({ query, tag: options.tag, refresh: options.refresh });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`\nError: ${message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('install <name>')
+  .description('Install a skill from the registry: download → audit → convert → write')
+  .option('--to <format>', 'Target format (.mdc, .cursorrules, skill.md, claude.md, mcp.json)')
+  .option('--dir <path>', 'Output directory (default: current directory)')
+  .option('--force', 'Skip security warnings')
+  .option('--no-tui', 'Non-interactive mode (uses defaults)')
+  .option('--refresh', 'Force refresh registry cache')
+  .action(async (name, options) => {
+    try {
+      const { installSkill } = await import('./marketplace/install.js');
+      await installSkill(name, {
+        to: options.to,
+        dir: options.dir,
+        force: options.force ?? false,
+        noTui: options.noTui ?? false,
+        refresh: options.refresh ?? false,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`\nError: ${message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('publish [path]')
+  .description('Publish a skill directory to the registry (requires GITHUB_TOKEN)')
+  .option('--force', 'Skip audit score check')
+  .option('--dry-run', 'Audit only, do not publish')
+  .action(async (path, options) => {
+    try {
+      const { publishSkill } = await import('./marketplace/publish.js');
+      await publishSkill(path || '.', {
+        force: options.force ?? false,
+        dryRun: options.dryRun ?? false,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`\nError: ${message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('list-installed')
+  .alias('ls')
+  .description('List all installed skills')
+  .action(async () => {
+    const { readFileSync, existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { homedir } = await import('node:os');
+    const installedFile = join(homedir(), '.transskill', 'installed.json');
+    if (!existsSync(installedFile)) {
+      console.log('No skills installed yet.');
+      return;
+    }
+    try {
+      const records = JSON.parse(readFileSync(installedFile, 'utf-8'));
+      if (records.length === 0) {
+        console.log('No skills installed yet.');
+        return;
+      }
+      console.log('\nInstalled skills:\n');
+      for (const r of records) {
+        console.log(`  ${r.name} v${r.version}  → ${r.format}  (${r.installedAt.slice(0, 10)})`);
+        console.log(`    ${r.outputPath}`);
+      }
+      console.log('');
+    } catch {
+      console.log('Could not read installed.json.');
+    }
+  });
+
 program.parse();
