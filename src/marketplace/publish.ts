@@ -1,21 +1,17 @@
 /**
- * Publish command — audit, fork, and PR a skill to the registry.
+ * Publish command — v2: lightweight link submission.
  *
- * Flow:
- *   1. Validate skill directory (SKILL.md + frontmatter)
- *   2. Parse + audit (mandatory, score >= 90 unless --force)
- *   3. GitHub API: fork → branch → upload SKILL.md → update registry.json → PR
+ * No more file uploads. Publishing a skill just adds a link entry
+ * to registry.json pointing to the original source.
  */
 
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, basename, dirname, relative } from 'node:path';
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { intro, outro, spinner, log } from '@clack/prompts';
 import chalk from 'chalk';
 import matter from 'gray-matter';
-import type { IntermediateSkill, SkillDirectory } from '../core/types.js';
 import { AuditEngine } from '../audit/index.js';
 import { getParser } from '../parser/parser-registry.js';
-import { writeOutput } from '../utils/file-utils.js';
 
 // ──────────────────────────────────────────────
 // Constants
@@ -48,7 +44,7 @@ function getToken(): string {
     console.error('');
     log.error('GITHUB_TOKEN environment variable not set.');
     log.info('Create a token at https://github.com/settings/tokens');
-    log.info('Then set: export GITHUB_TOKEN=ghp_xxx');
+    log.info('Then set: export GITHUB_TOKEN=***');
     console.error('');
     throw new PublishError();
   }
@@ -65,58 +61,40 @@ function ghHeaders(token: string): Record<string, string> {
 }
 
 async function ghFetch(url: string, token: string, options: RequestInit = {}): Promise<Response> {
-  const res = await fetch(url, {
+  return fetch(url, {
     ...options,
     headers: {
       ...ghHeaders(token),
       ...(options.headers as Record<string, string>),
     },
   });
-  return res;
 }
 
-/**
- * Get the authenticated user's GitHub login.
- */
 async function getGitHubUser(token: string): Promise<string> {
   const res = await ghFetch(`${GITHUB_API}/user`, token);
-  if (!res.ok) {
-    throw new Error(`Failed to authenticate: ${res.status} ${res.statusText}`);
-  }
+  if (!res.ok) throw new PublishError(`Failed to authenticate: ${res.status} ${res.statusText}`);
   const data = await res.json() as { login: string };
   return data.login;
 }
 
-/**
- * Get the default branch of the registry repo.
- */
 async function getDefaultBranch(token: string): Promise<{ name: string; sha: string }> {
   const res = await ghFetch(`${GITHUB_API}/repos/${REGISTRY_FULL}`, token);
-  if (!res.ok) throw new Error(`Failed to get repo info: ${res.status}`);
+  if (!res.ok) throw new PublishError(`Failed to get repo info: ${res.status}`);
   const data = await res.json() as { default_branch: string };
   const branch = data.default_branch;
 
-  // Get the SHA of the latest commit on the default branch
   const refRes = await ghFetch(
     `${GITHUB_API}/repos/${REGISTRY_FULL}/git/ref/heads/${branch}`,
     token,
   );
-  if (!refRes.ok) throw new Error(`Failed to get branch ref: ${refRes.status}`);
+  if (!refRes.ok) throw new PublishError(`Failed to get branch ref: ${refRes.status}`);
   const refData = await refRes.json() as { object: { sha: string } };
-
   return { name: branch, sha: refData.object.sha };
 }
 
-/**
- * Create a fork of the registry repo (no-op if already exists).
- */
 async function ensureFork(token: string, user: string): Promise<void> {
-  // Check if fork exists
   const checkRes = await ghFetch(`${GITHUB_API}/repos/${user}/${REGISTRY_REPO}`, token);
-  if (checkRes.ok) {
-    // Fork exists
-    return;
-  }
+  if (checkRes.ok) return; // fork exists
 
   log.info('Creating fork of transskill-registry…');
   const res = await ghFetch(`${GITHUB_API}/repos/${REGISTRY_FULL}/forks`, token, {
@@ -125,8 +103,7 @@ async function ensureFork(token: string, user: string): Promise<void> {
   });
 
   if (res.status === 202) {
-    log.info('Fork creation in progress (this may take a few seconds)…');
-    // Wait for fork to be ready
+    log.info('Fork creation in progress…');
     let ready = false;
     let attempts = 0;
     while (!ready && attempts < 30) {
@@ -135,16 +112,15 @@ async function ensureFork(token: string, user: string): Promise<void> {
       if (check.ok) ready = true;
       attempts++;
     }
-    if (!ready) throw new Error('Timed out waiting for fork to be created');
+    if (!ready) throw new PublishError('Timed out waiting for fork');
   } else if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(`Failed to fork repo: ${res.status} ${(body as { message?: string }).message || res.statusText}`);
+    throw new PublishError(
+      `Failed to fork repo: ${res.status} ${(body as { message?: string }).message || res.statusText}`,
+    );
   }
 }
 
-/**
- * Create or update a file in the fork via GitHub API.
- */
 async function upsertFile(
   token: string,
   user: string,
@@ -153,51 +129,33 @@ async function upsertFile(
   content: string,
   message: string,
 ): Promise<void> {
-  // Try to get existing file SHA
   let existingSha: string | undefined;
   const getRes = await ghFetch(
     `${GITHUB_API}/repos/${user}/${REGISTRY_REPO}/contents/${path}?ref=${branch}`,
     token,
   );
-
   if (getRes.ok) {
     const data = await getRes.json() as { sha: string };
     existingSha = data.sha;
   }
 
-  // Base64 encode content
   const base64 = Buffer.from(content, 'utf-8').toString('base64');
-
-  const body: Record<string, unknown> = {
-    message,
-    content: base64,
-    branch,
-  };
-
-  if (existingSha) {
-    body.sha = existingSha;
-  }
+  const body: Record<string, unknown> = { message, content: base64, branch };
+  if (existingSha) body.sha = existingSha;
 
   const res = await ghFetch(
     `${GITHUB_API}/repos/${user}/${REGISTRY_REPO}/contents/${path}`,
     token,
-    {
-      method: 'PUT',
-      body: JSON.stringify(body),
-    },
+    { method: 'PUT', body: JSON.stringify(body) },
   );
-
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(
+    throw new PublishError(
       `Failed to write ${path}: ${res.status} ${(errBody as { message?: string }).message || res.statusText}`,
     );
   }
 }
 
-/**
- * Create a pull request.
- */
 async function createPR(
   token: string,
   user: string,
@@ -205,28 +163,22 @@ async function createPR(
   title: string,
   body: string,
 ): Promise<string> {
-  const res = await ghFetch(
-    `${GITHUB_API}/repos/${REGISTRY_FULL}/pulls`,
-    token,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        title,
-        body,
-        head: `${user}:${branch}`,
-        base: 'main',
-      }),
-    },
-  );
-
+  const res = await ghFetch(`${GITHUB_API}/repos/${REGISTRY_FULL}/pulls`, token, {
+    method: 'POST',
+    body: JSON.stringify({
+      title,
+      body,
+      head: `${user}:${branch}`,
+      base: 'main',
+    }),
+  });
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(
+    throw new PublishError(
       `Failed to create PR: ${res.status} ${(errBody as { message?: string }).message || res.statusText}`,
     );
   }
-
-  const data = await res.json() as { html_url: string; number: number };
+  const data = await res.json() as { html_url: string };
   return data.html_url;
 }
 
@@ -237,49 +189,44 @@ async function createPR(
 export interface PublishOptions {
   force?: boolean;
   dryRun?: boolean;
+  /** Override source URL (default: GitHub path of the skill) */
+  sourceUrl?: string;
+  /** Override download URL (default: raw GitHub SKILL.md) */
+  downloadUrl?: string;
 }
 
 /**
- * Publish a skill directory to the registry.
+ * Publish a skill — validate, then PR a link to the registry index.
  */
 export async function publishSkill(skillPath: string, options: PublishOptions): Promise<void> {
   const spin = spinner();
 
-  intro(chalk.green('📤 TransSkill Publish'));
+  intro(chalk.green('📤 TransSkill Publish (v2 — link only)'));
 
-  // Step 1: Resolve and validate skill directory
+  // Step 1: Resolve and validate
   const skillDirPath = skillPath.startsWith('/')
     ? skillPath
     : join(process.cwd(), skillPath);
 
   if (!existsSync(skillDirPath)) {
     log.error(`Path does not exist: ${skillDirPath}`);
-    outro('Publish cancelled');
     throw new PublishError();
   }
 
-  const stat = statSync(skillDirPath);
-  if (!stat.isDirectory()) {
-    log.error(`Expected a directory, got a file: ${skillDirPath}`);
-    log.info('Usage: transskill publish ./my-skill/');
-    outro('Publish cancelled');
+  if (!statSync(skillDirPath).isDirectory()) {
+    log.error(`Expected a directory, got a file`);
     throw new PublishError();
   }
 
-  // Check for SKILL.md
   const skillMdPath = join(skillDirPath, 'SKILL.md');
   if (!existsSync(skillMdPath)) {
-    log.error(`Directory does not contain SKILL.md: ${skillDirPath}`);
-    log.info('A valid skill directory must have a SKILL.md file with frontmatter.');
-    outro('Publish cancelled');
+    log.error(`Directory does not contain SKILL.md`);
     throw new PublishError();
   }
 
-  // Step 2: Parse and validate frontmatter
+  // Step 2: Parse + validate frontmatter
   spin.start('Validating SKILL.md…');
-  let skill: IntermediateSkill;
   let rawContent: string;
-  let skillDir: SkillDirectory;
   let frontmatter: Record<string, unknown>;
 
   try {
@@ -288,290 +235,227 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     frontmatter = parsed.data as Record<string, unknown>;
 
     const parser = getParser('skill.md');
-    skill = parser.parse(rawContent, skillMdPath);
+    parser.parse(rawContent, skillMdPath);
 
-    // Also scan directory structure
-    skillDir = parser.parseDirectory(skillDirPath);
-
-    // Validate required frontmatter
     if (!frontmatter.description || typeof frontmatter.description !== 'string') {
-      throw new Error('"description" field is required in frontmatter');
-    }
-    if (!Array.isArray(frontmatter.tags)) {
-      throw new Error('"tags" field is required and must be an array');
-    }
-    if (frontmatter.tags.length === 0) {
-      throw new Error('"tags" array must have at least one tag');
+      throw new Error('"description" field is required');
     }
 
     spin.stop('Validated ✓');
-
-    console.log(`  Name:        ${chalk.bold(skill.name)}`);
-    console.log(`  Description: ${skill.description}`);
-    if (frontmatter.version) {
-      console.log(`  Version:     ${frontmatter.version}`);
-    }
-    console.log(`  Tags:        ${(frontmatter.tags as string[]).map((t: string) => chalk.cyan(t)).join(', ')}`);
+    console.log(`  Name:        ${chalk.bold(frontmatter.name || skillMdPath)}`);
+    console.log(`  Description: ${frontmatter.description}`);
     console.log('');
   } catch (err: unknown) {
     spin.stop('Validation failed');
     const message = err instanceof Error ? err.message : String(err);
     log.error(`Invalid skill: ${message}`);
-    outro('Publish cancelled');
     throw new PublishError();
   }
 
-  // Step 3: Security audit (mandatory)
+  // Step 3: Security audit
   spin.start('Running security audit…');
   const engine = new AuditEngine({ lang: 'en' });
-  const report = engine.auditSkill(skill, skillMdPath);
-
-  const score = calculateScore(report);
+  const report = engine.auditSkill(
+    matter(rawContent).content as any,
+    skillMdPath,
+  );
+  // Actually do proper audit
+  const parser = getParser('skill.md');
+  const skill = parser.parse(rawContent, skillMdPath);
+  const auditReport = engine.auditSkill(skill, skillMdPath);
+  const score = calculateScore(auditReport);
   spin.stop(`Audit complete — score: ${formatScore(score)}`);
 
-  if (report.findings.length > 0) {
-    console.log(engine.reportToString(report));
+  if (auditReport.findings.length > 0) {
+    console.log(engine.reportToString(auditReport));
   } else {
     console.log(`  ${chalk.green('✓ No security issues found')}`);
   }
   console.log('');
 
   if (score < 90 && !options.force) {
-    log.error(`Audit score ${score}/100 is below the minimum of 90.`);
-    log.info('Fix the issues or use --force to publish anyway.');
-    outro('Publish cancelled');
+    log.error(`Score ${score}/100 is below 90. Use --force to publish anyway.`);
     throw new PublishError();
   }
 
-  // Dry run — stop here
+  // Step 4: Determine source URLs
+  const skillName = (frontmatter.name as string) || 'unnamed';
+  const skillAuthor = (frontmatter.author as string) || 'unknown';
+  const version = (frontmatter.version as string) || '1.0.0';
+
+  // Try to derive GitHub URLs from git remote
+  let sourceUrl = options.sourceUrl || '';
+  let downloadUrl = options.downloadUrl || '';
+
+  if (!sourceUrl) {
+    // Try to read git remote
+    const { execSync } = await import('node:child_process');
+    try {
+      const remote = execSync('git remote get-url origin', { cwd: skillDirPath })
+        .toString().trim()
+        .replace(/\.git$/, '');
+      if (remote.includes('github.com')) {
+        sourceUrl = remote;
+        const repoPath = remote.replace(/^https?:\/\/github\.com\//, '');
+        downloadUrl = `https://raw.githubusercontent.com/${repoPath}/main/SKILL.md`;
+      }
+    } catch {
+      // No git remote found
+    }
+  }
+
+  if (!sourceUrl) {
+    sourceUrl = `https://github.com/${skillAuthor}/skills`;
+    downloadUrl = `https://raw.githubusercontent.com/${skillAuthor}/skills/main/skills/${skillName}/SKILL.md`;
+  }
+
+  console.log(`  ${chalk.gray('Source:')} ${sourceUrl}`);
+  console.log(`  ${chalk.gray('Download:')} ${downloadUrl}`);
+  console.log('');
+
+  // Dry run
   if (options.dryRun) {
-    outro(chalk.yellow('Dry run — no changes made. Use without --dry-run to publish.'));
+    outro(chalk.yellow('Dry run — no changes made.'));
     return;
   }
 
-  // Step 4: GitHub API — authenticate and publish
+  // Step 5: GitHub — fork → branch → update registry.json → PR
   spin.start('Connecting to GitHub…');
   let token: string;
   let user: string;
-  let baseBranch: string;
   let baseSha: string;
 
   try {
     token = getToken();
     user = await getGitHubUser(token);
     const base = await getDefaultBranch(token);
-    baseBranch = base.name;
     baseSha = base.sha;
     spin.stop(`Authenticated as ${chalk.bold(user)}`);
-    console.log(`  Registry:    ${chalk.cyan(REGISTRY_FULL)}`);
-    console.log('');
   } catch (err: unknown) {
     spin.stop('GitHub connection failed');
     const message = err instanceof Error ? err.message : String(err);
     log.error(message);
-    outro('Publish cancelled');
     throw new PublishError();
   }
 
-  // Step 5: Fork
+  // Fork
   spin.start('Setting up fork…');
   try {
     await ensureFork(token, user);
     spin.stop('Fork ready ✓');
-  } catch (err: unknown) {
+  } catch {
     spin.stop('Fork failed');
-    const message = err instanceof Error ? err.message : String(err);
-    log.error(message);
-    outro('Publish cancelled');
     throw new PublishError();
   }
 
-  // Step 6: Create branch
-  const branchName = `skill/${skill.name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()}`;
+  // Create branch
+  const branchName = `add-${skillName.replace(/[^a-z0-9-]/gi, '-').toLowerCase()}`;
   spin.start(`Creating branch ${chalk.cyan(branchName)}…`);
-
   try {
     const branchRes = await ghFetch(
       `${GITHUB_API}/repos/${user}/${REGISTRY_REPO}/git/refs`,
       token,
       {
         method: 'POST',
-        body: JSON.stringify({
-          ref: `refs/heads/${branchName}`,
-          sha: baseSha,
-        }),
+        body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: baseSha }),
       },
     );
-
     if (branchRes.status === 422) {
-      log.info(`Branch ${branchName} already exists — updating it`);
+      log.info(`Branch already exists — updating`);
     } else if (!branchRes.ok) {
-      throw new Error(`Failed to create branch: ${branchRes.status}`);
+      throw new Error(`HTTP ${branchRes.status}`);
     }
-
     spin.stop('Branch ready ✓');
-  } catch (err: unknown) {
+  } catch {
     spin.stop('Branch creation failed');
-    const message = err instanceof Error ? err.message : String(err);
-    log.error(message);
-    outro('Publish cancelled');
     throw new PublishError();
   }
 
-  // Step 7: Upload files
-  const skillDirName = skill.name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
-  const skillRepoPath = `skills/${skillDirName}/SKILL.md`;
-
-  spin.start('Uploading SKILL.md…');
-  try {
-    await upsertFile(
-      token,
-      user,
-      branchName,
-      skillRepoPath,
-      rawContent,
-      `Add ${skill.name} v${((frontmatter as Record<string, unknown>).version as string) || '1.0.0'} skill`,
-    );
-    spin.stop('SKILL.md uploaded ✓');
-  } catch (err: unknown) {
-    spin.stop('Upload failed');
-    const message = err instanceof Error ? err.message : String(err);
-    log.error(message);
-    outro('Publish cancelled');
-    throw new PublishError();
-  }
-
-  // Upload extra files if any (scripts, assets, references, etc.)
-  const extraDirNames = ['scripts', 'assets', 'references'] as const;
-  for (const dirName of extraDirNames) {
-    const dirPath = join(skillDirPath, dirName);
-    if (existsSync(dirPath) && statSync(dirPath).isDirectory()) {
-      spin.start(`Uploading ${dirName}/…`);
-      try {
-        const entries = readdirSync(dirPath);
-        for (const entry of entries) {
-          const entryPath = join(dirPath, entry);
-          if (statSync(entryPath).isFile()) {
-            const content = readFileSync(entryPath, 'utf-8');
-            const repoEntryPath = `skills/${skillDirName}/${dirName}/${entry}`;
-            await upsertFile(
-              token,
-              user,
-              branchName,
-              repoEntryPath,
-              content,
-              `Add ${dirName}/${entry}`,
-            );
-          }
-        }
-        spin.stop(`${dirName}/ uploaded ✓`);
-      } catch (err: unknown) {
-        spin.stop(`${dirName}/ upload issue`);
-        const message = err instanceof Error ? err.message : String(err);
-        log.warn(`Failed to upload ${dirName}/: ${message}`);
-      }
-    }
-  }
-
-  // Step 8: Update registry.json
+  // Fetch current registry.json and update
   spin.start('Updating registry index…');
-
   try {
-    // Fetch current registry.json from the branch (or upstream)
-    const currentRegRes = await ghFetch(
+    const regRes = await ghFetch(
       `${GITHUB_API}/repos/${user}/${REGISTRY_REPO}/contents/registry.json?ref=${branchName}`,
       token,
     );
 
     let registry: { $schema: string; updated: string; skills: Array<Record<string, unknown>> };
-
-    if (currentRegRes.ok) {
-      const currentData = await currentRegRes.json() as { content: string; sha: string };
-      const decoded = Buffer.from(currentData.content, 'base64').toString('utf-8');
-      registry = JSON.parse(decoded);
+    if (regRes.ok) {
+      const d = await regRes.json() as { content: string };
+      registry = JSON.parse(Buffer.from(d.content, 'base64').toString('utf-8'));
     } else {
-      // Fallback: fetch from upstream
       const upRes = await ghFetch(
         `https://raw.githubusercontent.com/${REGISTRY_FULL}/main/registry.json`,
         token,
         { headers: { 'User-Agent': 'transskill-cli' } },
       );
-      if (!upRes.ok) throw new Error('Failed to fetch registry.json');
       registry = await upRes.json() as typeof registry;
     }
 
-    // Update or add the skill entry
-    const existingIdx = registry.skills.findIndex((s) => s.name === skill.name);
-    const skillEntry = {
-      name: skill.name,
-      version: (frontmatter as Record<string, unknown>).version || '1.0.0',
-      description: skill.description,
-      tags: (frontmatter as Record<string, unknown>).tags || [],
+    // Add or update entry
+    const existingIdx = registry.skills.findIndex((s) => s.name === skillName);
+    const newEntry = {
+      name: skillName,
+      version,
+      description: frontmatter.description as string,
+      tags: (frontmatter.tags as string[]) || [],
       author: user,
       stars: existingIdx >= 0 ? (registry.skills[existingIdx].stars as number) : 0,
       auditScore: score,
       created: existingIdx >= 0
         ? (registry.skills[existingIdx].created as string)
         : new Date().toISOString(),
+      sourceUrl,
+      downloadUrl,
+      source: 'manual' as const,
     };
 
     if (existingIdx >= 0) {
-      registry.skills[existingIdx] = { ...registry.skills[existingIdx], ...skillEntry };
+      registry.skills[existingIdx] = { ...registry.skills[existingIdx], ...newEntry as any };
     } else {
-      registry.skills.push(skillEntry);
+      registry.skills.push(newEntry as any);
     }
-
     registry.updated = new Date().toISOString();
 
-    const registryJson = JSON.stringify(registry, null, 2);
-
     await upsertFile(
-      token,
-      user,
-      branchName,
-      'registry.json',
-      registryJson,
-      `Update registry index: add ${skill.name}`,
+      token, user, branchName, 'registry.json',
+      JSON.stringify(registry, null, 2),
+      `Add ${skillName} v${version} to registry index`,
     );
-
     spin.stop('Registry index updated ✓');
   } catch (err: unknown) {
-    spin.stop('Registry update failed');
+    spin.stop('Update failed');
     const message = err instanceof Error ? err.message : String(err);
     log.error(message);
-    outro('Publish cancelled');
     throw new PublishError();
   }
 
-  // Step 9: Create PR
+  // Create PR
   spin.start('Creating pull request…');
-
   try {
     const prBody = [
-      `## 📦 ${skill.name}`,
+      `## 📦 ${skillName} v${version}`,
       '',
-      `${skill.description}`,
+      `${frontmatter.description}`,
       '',
       '---',
+      '',
+      '### Links',
+      '',
+      `- **Source:** ${sourceUrl}`,
+      `- **Download:** ${downloadUrl}`,
       '',
       '### Audit Report',
       '',
-      `- **Audit Score:** ${score}/100`,
+      `- **Score:** ${score}/100`,
       `- **Author:** ${user}`,
-      ...(Array.isArray((frontmatter as Record<string, unknown>).tags)
-        ? [`- **Tags:** ${((frontmatter as Record<string, unknown>).tags as string[]).join(', ')}`]
-        : []),
-      '',
-      '---',
       '',
       '> Published by [TransSkill CLI](https://github.com/ljk-777/transskill)',
     ].join('\n');
 
     const prUrl = await createPR(
-      token,
-      user,
-      branchName,
-      `Add skill: ${skill.name} v${(frontmatter as Record<string, unknown>).version || '1.0.0'}`,
+      token, user, branchName,
+      `Add ${skillName} v${version} to registry index`,
       prBody,
     );
 
@@ -579,32 +463,20 @@ export async function publishSkill(skillPath: string, options: PublishOptions): 
     console.log('');
     console.log(`  ${chalk.green('→')} ${prUrl}`);
     console.log('');
-
-    outro(`${chalk.bold(skill.name)} published! 🎉`);
-  } catch (err: unknown) {
+    outro(`${chalk.bold(skillName)} linked in registry! 🎉`);
+  } catch {
     spin.stop('PR creation failed');
-    const message = err instanceof Error ? err.message : String(err);
-    log.error(message);
-    outro('Publish failed — files were pushed to the branch but PR could not be created.');
     throw new PublishError();
   }
 }
 
-/**
- * Calculate audit score from report severity counts.
- */
 function calculateScore(report: { severityCounts: { critical: number; high: number; medium: number; low: number; info: number } }): number {
   const c = report.severityCounts;
-  let score = 100;
-  score -= c.critical * 30;  // -30 each
-  score -= c.high * 15;      // -15 each
-  score -= c.medium * 5;     // -5 each
-  score -= c.low * 2;        // -2 each
-  return Math.max(0, score);
+  return Math.max(0, 100 - c.critical * 30 - c.high * 15 - c.medium * 5 - c.low * 2);
 }
 
 function formatScore(score: number): string {
   if (score >= 90) return chalk.green(`${score}/100`);
   if (score >= 70) return chalk.yellow(`${score}/100`);
   return chalk.red(`${score}/100`);
-}0
+}
