@@ -1,30 +1,64 @@
 # TransSkill
 
-> **Write once, run on any agent.**
+> **Write once, run on any agent. Search, audit, and install from 1,000+ skills.**
 
-TransSkill is a CLI tool that converts AI agent skill files between different platforms.
-Stop manually rewriting skills for every agent — convert with one command.
-
+[![npm](https://img.shields.io/npm/v/transskill)](https://www.npmjs.com/package/transskill)
 [![中文文档](https://img.shields.io/badge/文档-中文-blue)](README.zh.md)
 
 ---
 
-## The Problem
+## ✨ What Makes TransSkill Different
 
-Every AI coding agent has its own skill format.
-Claude Code uses SKILL.md, Cursor uses .cursorrules,
-OpenClaw uses AGENTS.md, and MCP servers use JSON Schema.
-A skill written for one platform is useless on another without manual rewriting.
+### 🗂️ Universal Skill Search — 1,115+ Skills, One Command
 
-## The Solution
+Stop hunting across GitHub repos. TransSkill indexes **1,115+ real-world agent skills** from the [awesome-agent-skills](https://github.com/VoltAgent/awesome-agent-skills) ecosystem — curated skills from **Anthropic, Stripe, Google Gemini, Vercel, Cloudflare, Angular, Supabase, and more**.
 
+```bash
+# Interactive search — type to filter, enter to install
+npx transskill search
+
+# Fast CLI search
+npx transskill search docx --json
+npx transskill search python --tag linter
 ```
-$ transskill convert .cursorrules --to skill.md
-$ transskill convert gh:user/weather-skill --to .cursorrules
-$ transskill convert ./my-skill/ --to .mdc --glob "**/*.ts"
+
+Every skill is fetched directly from its **original source** — no copies, no stale mirrors.
+
+### 🛡️ Built-in Security Audit
+
+Before you install any skill, TransSkill automatically scans it for security risks:
+
+| Level | What It Catches |
+|-------|----------------|
+| **L1 — Instructions** | `rm -rf`, `curl\|sh`, base64 obfuscation, prompt injection |
+| **L2 — Permissions** | Overly broad globs, dangerous MCP tool names |
+| **L3 — MCP** | Suspicious server commands (`sudo`, `kill`, `rm`) |
+
+```bash
+# Audit any skill file
+npx transskill audit ./skill.skill.md
+
+# Install with automatic audit (blocks if score < 90)
+npx transskill install python-linter
 ```
 
-One command. Any platform.
+### 🔄 Cross-Platform Conversion
+
+Convert between every major agent skill format — **without manual rewriting**.
+
+```bash
+npx transskill convert .cursorrules --to skill.md
+npx transskill convert gh:user/weather-skill --to .mdc
+npx transskill convert ./my-skill/ --to .cursorrules --glob "src/**/*.ts"
+```
+
+| Format | Platforms | In | Out |
+|--------|-----------|:--:|:---:|
+| SKILL.md | Claude Code, Codex CLI, OpenClaw, Cursor | ✅ | ✅ |
+| .cursorrules | Cursor IDE | ✅ | ✅ |
+| .mdc | Cursor 2.3+ | ✅ | ✅ |
+| MCP JSON | Any MCP client | ✅ | — |
+| SOUL.md | OpenClaw | ✅ | — |
 
 ---
 
@@ -32,285 +66,111 @@ One command. Any platform.
 
 ```bash
 npm install -g transskill
-```
-
-Or run directly:
-
-```bash
-npx transskill convert .cursorrules --to skill.md
-```
-
-## Quick Start
-
-```bash
-# SKILL.md → .cursorrules
-transskill convert my-skill.skill.md --to .cursorrules
-
-# .cursorrules → SKILL.md
-transskill convert .cursorrules --to skill.md
-
-# .cursorrules → .mdc (Cursor 2.3+ with file scoping)
-transskill convert .cursorrules --to .mdc --glob "src/**/*.ts"
-
-# Full skill directory → Cursor rules
-transskill convert ./weather-skill/ --to .cursorrules
-
-# GitHub repo → Claude Code skill (direct install)
-transskill convert gh:user/weather-skill --to skill.md \
-  --install-to ~/.claude/skills/
-
-# Preview without writing
-transskill convert .cursorrules --to skill.md --dry-run
-```
-
-## Input Sources
-
-| Format | Example | Description |
-|--------|---------|-------------|
-| Local file | `./rules.cursorrules` | Single skill file |
-| Local directory | `./weather-skill/` | Full skill directory with scripts and assets |
-| GitHub repo | `gh:user/repo` | Shallow clone + convert |
-| GitHub subpath | `gh:user/repo/path` | Clone specific subdirectory |
-| GitHub URL | `https://github.com/user/repo` | Full URL support |
-
-## Supported Formats
-
-| Format | Platforms | Input | Output |
-|--------|-----------|:-----:|:------:|
-| SKILL.md | Claude Code, Codex CLI, OpenClaw, Cursor | ✅ | ✅ |
-| .cursorrules | Cursor IDE | ✅ | ✅ |
-| .mdc | Cursor 2.3+ | ✅ | ✅ |
-| MCP JSON | Any MCP-compatible client | ✅ | — |
-| SOUL.md | OpenClaw | ✅ | — |
-
-## How It Works
-
-```
-Input (file/dir/GitHub)
-    │
-    ▼
-InputResolver ──► Parser ──► Mapper ──► Renderer ──► Output
-(Local/GitHub)    (read)      (map)      (write)
-```
-
-TransSkill uses a pipeline architecture:
-
-1. **InputResolver** — resolves your input (local path or GitHub URL) to a local file path
-2. **Parser** — reads platform-specific format and converts to a universal intermediate representation
-3. **Mapper** — maps fields between platforms, reporting what's preserved and what's lost
-4. **Renderer** — writes the result in the target platform's format
-
-## Examples
-
-### Convert a local file
-
-```bash
-$ cat .cursorrules
-# My TypeScript Rules
-Always use strict mode
-Prefer named exports
-
-$ transskill convert .cursorrules --to skill.md -o typescript-rule.md
-✅ Conversion complete
-   output: ./typescript-rule.md
-```
-
-### Convert from GitHub to Cursor rules
-
-```bash
-$ transskill convert gh:anthropics/skills/weather --to .cursorrules \
-  --install-to .cursor/rules/
-
-⬇️  Cloning: gh:anthropics/skills
-✅ Installed: .cursor/rules/weather.cursorrules
-```
-
-### Directory conversion with loss report
-
-```bash
-$ transskill convert ./weather-skill/ --to .cursorrules
-✅ Directory conversion complete
-   weather-skill/SKILL.md         → weather-skill.cursorrules
-   weather-skill/scripts/         → ./scripts/ (copied)
-   weather-skill/references/      → ./references/ (copied)
-   ⚠️  SKILL.md scripts reference will not work in .cursorrules
+# or run directly:
+npx transskill --help
 ```
 
 ## Commands
 
+### 🔍 Search & Install (Marketplace)
+
 ```bash
-# Convert a skill to another format
-transskill convert <input> --to <format> [options]
+# Interactive search — browse 1,115+ skills
+npx transskill search
 
-# List all supported formats
-transskill list-formats
+# JSON output (scripts/CI)
+npx transskill search react --json
 
-# Validate a skill file or directory
-transskill validate <input>
-
-# Security audit a skill file or directory
-transskill audit <input> [options]
-
-# See all options
-transskill --help
+# Install directly from registry → download → audit → convert → write
+npx transskill install docx
+npx transskill install python-linter --to .mdc
+npx transskill install claude-api --to skill.md --dir ~/.claude/skills/
 ```
 
-### Options for `convert`
+### 🔄 Convert
 
-| Flag | Description |
-|------|-------------|
-| `-t, --to <format>` | Target format (required) |
-| `-o, --output <path>` | Output directory (default: current dir) |
-| `--install-to <path>` | Install directly to agent config dir |
-| `--glob <pattern>` | File glob pattern (for .mdc output) |
-| `--always-apply` | Always apply rule (for .mdc output) |
-| `--dry-run` | Preview without writing files |
-| `-v, --verbose` | Detailed conversion report |
+```bash
+# Single file
+npx transskill convert .cursorrules --to skill.md
 
-### Options for `audit`
+# GitHub repo
+npx transskill convert gh:anthropics/skills/docx --to .cursorrules
 
-| Flag | Description |
-|------|-------------|
-| `--format <type>` | Output format: `console` or `json` (default: console) |
-| `--quiet` | Only show summary score |
-| `--min-severity <level>` | Minimum severity: `info`, `low`, `medium`, `high`, `critical` (default: info) |
-| `--auditor <id>` | Run only specific auditor (can be repeated) |
-| `-v, --verbose` | Show detailed findings |
+# Skill directory with assets
+npx transskill convert ./skill-dir/ --to .cursorrules
+
+# Preview what would be lost
+npx transskill diff .cursorrules --to skill.md
+```
+
+### 🛡️ Audit
+
+```bash
+npx transskill audit ./skill.skill.md
+npx transskill audit ./skill-dir/ --format json --quiet
+```
+
+### 📤 Publish
+
+```bash
+# Submit a skill link to the registry (PR)
+npx transskill publish ./my-skill/
+
+# Batch publish skills from a directory
+npx transskill publish-all ./skills/ --dry-run
+```
 
 ---
 
-## Security Audit
-
-TransSkill includes a built-in security scanner that analyzes skill files for potential security risks before you install or use them.
-
-```bash
-# Quick scan a skill file
-transskill audit my-skill.skill.md
-
-# JSON output for programmatic use
-transskill audit ./skill-dir/ --format json
-
-# Quiet mode — just the score
-transskill audit my-skill.skill.md --quiet
-
-# Only show high and critical issues
-transskill audit .cursorrules --min-severity high
-
-# Run a specific auditor only
-transskill audit mcp.json --auditor permission-scanner
-```
-
-### Audit Levels
-
-The scanner checks three layers of security concerns:
-
-| Level | Scanner | What It Checks |
-|-------|---------|----------------|
-| **L1 — Instructions** | `instruction-scanner` | Dangerous shell commands (`rm -rf`, `sudo`, `curl|sh`), prompt injection patterns, base64/hex obfuscation, suspicious URLs, remote code execution |
-| **L2 — Permissions** | `permission-scanner` | Overly broad `.mdc` globs, `alwaysApply` without scope, dangerous MCP tool names (shell/exec), filesystem access, network access, Claude `disableModelInvocation` settings |
-| **L3 — MCP** | `permission-scanner` | MCP server commands (`rm`, `sudo`, `kill`), MCP tool capabilities that could be abused |
-
-> Note: L3 checks are handled by the same PermissionScanner that handles L2. They are reported together in a single scan pass.
-
-### Scoring System
-
-The audit engine computes a numeric score (0–100) with an A–F letter grade:
-
-| Level | Score Range | Meaning |
-|-------|-------------|---------|
-| **A** | 90–100 | Excellent — minimal or no issues |
-| **B** | 70–89 | Good — minor low-severity findings |
-| **C** | 50–69 | Fair — moderate issues, review recommended |
-| **D** | 30–49 | Poor — significant issues, use with caution |
-| **F** | 0–29 | Critical — unsafe, do not use without remediation |
-
-Each finding carries a severity weight that reduces the score:
-
-| Severity | Weight |
-|----------|--------|
-| 🔴 Critical | −25 pts |
-| 🟠 High | −10 pts |
-| 🟡 Medium | −4 pts |
-| 🟢 Low | −1 pt |
-| ℹ️ Info | 0 pts |
-
-### Output Formats
-
-**Console** (default): Human-readable report with colored severity labels, line numbers, and context snippets.
+## How It Works
 
 ```
-$ transskill audit my-skill.skill.md
+Input (file/dir/GitHub/Registry)
+    │
+    ▼
+InputResolver ──► Parser ──► Mapper ──► Renderer ──► Output
+(Local/GitHub)    (read)      (map)      (write)
 
-╔══════════════════════════════════════════════╗
-║  TransSkill Security Audit                  ║
-║  Target: my-skill.skill.md                  ║
-╚══════════════════════════════════════════════╝
-
-Audit Level: L1 + L2 + L3
-
-Findings (3):
-
-🔴 Critical  | L2-003b  | MCP server 使用危险命令: rm
-              → ./my-skill.skill.md
-
-🟠 High      | L1-001   | Detected dangerous command: rm -rf /
-              → ./my-skill.skill.md:24
-              →     run: rm -rf /tmp/cache
-
-🟡 Medium    | L2-001b  | alwaysApply 规则 globs 范围过宽
-              → ./my-skill.skill.md
-
-Score: 65/100 — Level C
-3 findings (1 critical, 1 high, 1 medium)
+Registry ──► Search ──► Install ──► Audit ──► Convert ──► Write
+(1,115+)      (TUI/JSON)  (auto)
 ```
 
-**JSON**: Machine-readable for CI/CD pipelines and programmatic consumption.
+TransSkill's pipeline:
+1. **InputResolver** — resolves local/GitHub/registry sources
+2. **Parser** — reads 6 formats into a universal intermediate representation
+3. **Mapper** — cross-platform field mapping with loss reporting
+4. **Renderer** — writes in the target format
+5. **AuditEngine** — security scanning at every level
+6. **Marketplace** — search, install, and publish via the registry
 
-```bash
-transskill audit ./skills/ --format json
-```
+---
 
-**Quiet**: One-line summary, ideal for quick checks.
+## Security Audit Scoring
 
-```bash
-transskill audit .cursorrules --quiet
-# 📊 C (65/100) — 3 findings (1🔴 1🟠 1🟡)
-```
+| Score | Grade | Meaning |
+|-------|-------|---------|
+| 90–100 | **A** | Excellent |
+| 70–89 | **B** | Good — minor issues |
+| 50–69 | **C** | Fair — review recommended |
+| 30–49 | **D** | Poor — significant issues |
+| 0–29 | **F** | Critical — do not use |
 
-### CI/CD Integration
-
-Use the JSON flag to integrate audit results into your CI pipeline:
-
-```bash
-#!/bin/bash
-# Fail build if score drops below B (70)
-RESULT=$(transskill audit ./skills/ --format json)
-SCORE=$(echo $RESULT | jq '.score.total')
-if [ "$SCORE" -lt 70 ]; then
-  echo "❌ Security score $SCORE is below threshold (70)"
-  exit 1
-fi
-echo "✅ Security score $SCORE — passing"
-```
+---
 
 ## Project Status
 
-**v0.2.1 — Active development.** See [tasks.md](specs/tasks.md) for current progress.
+**v0.4.0** — Active development.
 
-| Phase | Status |
-|-------|--------|
-| Phase 0: Project scaffold | ✅ Complete |
-| Phase 1: InputResolver + types | ✅ Complete |
-| Phase 2: Parser layer | ✅ Complete |
-| Phase 3: Mapper + Renderer | ✅ Complete |
-| Phase 4: CLI pipeline | ✅ Complete |
-| Phase 5: Tests | ⬜ In Progress |
-| Phase 6: CI + publish | ⬜ Pending |
-| Phase A: Security audit | ✅ Complete |
+| Feature | Status |
+|---------|--------|
+| ✅ Format conversion (6 formats) | Complete |
+| ✅ Security audit (L1–L3) | Complete |
+| ✅ Marketplace search (1,115+ skills) | Complete |
+| ✅ Install (download → audit → convert) | Complete |
+| ✅ Publish (link submission) | Complete |
+| ⬜ Tests | In progress |
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a new format.
+---
 
 ## License
 
