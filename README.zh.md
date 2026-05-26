@@ -70,6 +70,21 @@ npm install -g transskill
 npx transskill --help
 ```
 
+> **🌏 国内用户加速：** 如果 `raw.githubusercontent.com` 访问慢，设置镜像环境变量：
+> ```bash
+> # 使用 ghproxy 镜像（Windows CMD 用 set 而非 export）
+> export TRANSKILL_GITHUB_MIRROR=https://ghproxy.net/
+> npx transskill search
+>
+> # 或使用自己的代理
+> export HTTPS_PROXY=http://127.0.0.1:7890
+>
+> # 也可以自定义 registry 地址
+> export TRANSKILL_REGISTRY_URL=https://your-mirror/registry.json
+> ```
+>
+> 设置后首次加载 registry 会快很多，之后 24h 内走本地缓存无需重复下载。
+
 ## 命令
 
 ### 🔍 搜索与安装（市场）

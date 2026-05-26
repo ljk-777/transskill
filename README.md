@@ -70,6 +70,21 @@ npm install -g transskill
 npx transskill --help
 ```
 
+> **🌏 Mirror for restricted regions:** Set environment variables to bypass GitHub raw access limits:
+> ```bash
+> # Use ghproxy mirror (Chinese mainland) — use `set` instead of `export` on Windows CMD
+> export TRANSKILL_GITHUB_MIRROR=https://ghproxy.net/
+> npx transskill search
+>
+> # Or use your own HTTP proxy
+> export HTTPS_PROXY=http://127.0.0.1:7890
+>
+> # Or override the registry URL entirely
+> export TRANSKILL_REGISTRY_URL=https://your-mirror/registry.json
+> ```
+>
+> After setting, the first load uses the mirror. Subsequent runs use local cache for 24h.
+
 ## Commands
 
 ### 🔍 Search & Install (Marketplace)

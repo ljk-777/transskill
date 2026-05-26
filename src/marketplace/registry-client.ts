@@ -67,11 +67,16 @@ function writeCache(index: RegistryIndex): void {
 
 /**
  * Prepend GitHub raw mirror if set.
+ *
+ * ghproxy.net format: https://ghproxy.net/https://raw.githubusercontent.com/...
+ * So we prepend the mirror prefix to the original URL.
  */
 function mirrorUrl(rawUrl: string): string {
   if (!GITHUB_RAW_MIRROR) return rawUrl;
   if (rawUrl.startsWith('https://raw.githubusercontent.com/')) {
-    return rawUrl.replace('https://raw.githubusercontent.com/', GITHUB_RAW_MIRROR);
+    // Strip trailing slash from mirror, join with raw URL
+    const mirror = GITHUB_RAW_MIRROR.replace(/\/+$/, '');
+    return `${mirror}/${rawUrl}`;
   }
   return rawUrl;
 }

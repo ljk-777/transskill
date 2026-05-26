@@ -39,39 +39,93 @@ function skillFilter(search: string, option: { label?: string; value: SkillManif
 }
 
 /**
+ * Ask a simple question via readline (for Windows CMD where TUI is broken).
+ */
+function askQuestion(prompt: string, validOptions: string[]): Promise<string> {
+  return new Promise((resolve) => {
+    const rl = require('node:readline').createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    const ask = () => {
+      rl.question(`${prompt} `, (answer: string) => {
+        const trimmed = answer.trim();
+        if (validOptions.includes(trimmed)) {
+          rl.close();
+          resolve(trimmed);
+        } else {
+          console.log(`  (enter one of: ${validOptions.join(', ')})`);
+          ask();
+        }
+      });
+    };
+    ask();
+  });
+}
+
+/**
  * Show action menu after selecting a skill: preview, install, or back.
+ * Uses select when terminal supports it, falls back to simple Q&A.
  */
 async function showAndOfferInstall(manifest: SkillManifest): Promise<void> {
-  const action = await select({
-    message: `Selected ${chalk.bold(manifest.name)} v${manifest.version}`,
-    options: [
-      { value: 'preview', label: 'Preview  Show full description and README' },
-      { value: 'install', label: 'Install  Download and convert to local format' },
-      { value: 'back', label: 'Back     Return to search' },
-    ],
-  });
+  const needsFallback = process.platform === 'win32' && !process.env.WT_SESSION;
 
-  if (isCancel(action)) return;
+  let action: string | symbol;
+
+  if (needsFallback) {
+    console.log(`\n  [${manifest.name} v${manifest.version}]`);
+    const answer = await askQuestion(
+      '  Action (1=Preview, 2=Install, 3=Back):',
+      ['1', '2', '3'],
+    );
+    const map: Record<string, string> = { '1': 'preview', '2': 'install', '3': 'back' };
+    action = map[answer];
+  } else {
+    action = await select({
+      message: `Selected ${chalk.bold(manifest.name)} v${manifest.version}`,
+      options: [
+        { value: 'preview', label: 'Preview  Show full description and README' },
+        { value: 'install', label: 'Install  Download and convert to local format' },
+        { value: 'back', label: 'Back     Return to search' },
+      ],
+    });
+    if (isCancel(action)) return;
+  }
 
   if (action === 'preview') {
     await showSkillInfo(manifest.name);
-    // Loop back to menu after preview
     await showAndOfferInstall(manifest);
   } else if (action === 'install') {
-    const fmt = await select({
-      message: 'Select target format:',
-      options: [
-        { value: '.mdc', label: '.mdc         (Cursor IDE)', hint: 'Supports globs + alwaysApply' },
-        { value: '.cursorrules', label: '.cursorrules  (Cursor IDE)', hint: 'Classic Cursor format' },
-        { value: 'skill.md', label: 'skill.md     (Universal)', hint: 'Canonical format' },
-        { value: 'claude.md', label: 'claude.md    (Claude Code)', hint: 'Claude Code agent skill' },
-        { value: 'mcp.json', label: 'mcp.json     (MCP Server)', hint: 'MCP server definition' },
-      ],
-    });
-    if (isCancel(fmt)) return;
-    await installSkill(manifest.name, { to: fmt as string, force: false, noTui: true });
+    let targetFormat: string;
+
+    if (needsFallback) {
+      const answer = await askQuestion(
+        '  Format (1=.mdc, 2=.cursorrules, 3=skill.md, 4=claude.md, 5=mcp.json):',
+        ['1', '2', '3', '4', '5'],
+      );
+      const formatMap: Record<string, string> = {
+        '1': '.mdc', '2': '.cursorrules', '3': 'skill.md',
+        '4': 'claude.md', '5': 'mcp.json',
+      };
+      targetFormat = formatMap[answer];
+    } else {
+      const fmt = await select({
+        message: 'Select target format:',
+        options: [
+          { value: '.mdc', label: '.mdc         (Cursor IDE)', hint: 'Supports globs + alwaysApply' },
+          { value: '.cursorrules', label: '.cursorrules  (Cursor IDE)', hint: 'Classic Cursor format' },
+          { value: 'skill.md', label: 'skill.md     (Universal)', hint: 'Canonical format' },
+          { value: 'claude.md', label: 'claude.md    (Claude Code)', hint: 'Claude Code agent skill' },
+          { value: 'mcp.json', label: 'mcp.json     (MCP Server)', hint: 'MCP server definition' },
+        ],
+      });
+      if (isCancel(fmt)) return;
+      targetFormat = fmt as string;
+    }
+
+    await installSkill(manifest.name, { to: targetFormat, force: false, noTui: true });
   }
-  // back → return without action, search exits
+  // back → exit
 }
 
 /**
