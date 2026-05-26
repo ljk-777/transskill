@@ -57,8 +57,11 @@ export function detectFormatFromPath(localPath: string): FormatDetectionResult {
 
   // File mode - detect by extension and content
   const ext = extname(localPath).toLowerCase();
+  const baseName = basename(localPath);
 
   // Quick extension-based detection
+  // Note: extname('.cursorrules') returns '' because Node treats
+  // leading-dot files as extension-less. Check basename.
   const extMap: Record<string, FormatType> = {
     '.cursorrules': '.cursorrules',
     '.mdc': '.mdc',
@@ -68,12 +71,20 @@ export function detectFormatFromPath(localPath: string): FormatDetectionResult {
     return { format: extMap[ext], isDirectory: false };
   }
 
+  // Check basename for hidden files (start with dot)
+  if (baseName.startsWith('.')) {
+    for (const [extKey, fmt] of Object.entries(extMap)) {
+      if (baseName.endsWith(extKey)) {
+        return { format: fmt, isDirectory: false };
+      }
+    }
+  }
+
   if (ext === '.json') {
     return { format: 'mcp.json', isDirectory: false };
   }
 
   if (ext === '.md') {
-    const baseName = localPath.split('/').pop() || localPath.split('\\').pop() || '';
 
     // Check by filename
     if (baseName === 'SOUL.md') return { format: 'soul.md', isDirectory: false };

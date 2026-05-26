@@ -2,11 +2,12 @@
  * Interactive search TUI — search and browse skills from the registry.
  */
 
-import { intro, outro, autocomplete, isCancel, log, note, spinner } from '@clack/prompts';
+import { intro, outro, autocomplete, select, isCancel, log, note, spinner } from '@clack/prompts';
 import chalk from 'chalk';
 import type { SkillManifest, RegistryIndex } from './types.js';
 import { getRegistry, searchSkills } from './registry-client.js';
 import { showSkillInfo } from './info.js';
+import { installSkill } from './install.js';
 
 const BRAND = chalk.cyan('◈ TransSkill Marketplace');
 
@@ -38,10 +39,39 @@ function skillFilter(search: string, option: { label?: string; value: SkillManif
 }
 
 /**
- * Show detailed info about a selected skill.
+ * Show action menu after selecting a skill: preview, install, or back.
  */
 async function showAndOfferInstall(manifest: SkillManifest): Promise<void> {
-  await showSkillInfo(manifest.name);
+  const action = await select({
+    message: `Selected ${chalk.bold(manifest.name)} v${manifest.version}`,
+    options: [
+      { value: 'preview', label: 'Preview  Show full description and README' },
+      { value: 'install', label: 'Install  Download and convert to local format' },
+      { value: 'back', label: 'Back     Return to search' },
+    ],
+  });
+
+  if (isCancel(action)) return;
+
+  if (action === 'preview') {
+    await showSkillInfo(manifest.name);
+    // Loop back to menu after preview
+    await showAndOfferInstall(manifest);
+  } else if (action === 'install') {
+    const fmt = await select({
+      message: 'Select target format:',
+      options: [
+        { value: '.mdc', label: '.mdc         (Cursor IDE)', hint: 'Supports globs + alwaysApply' },
+        { value: '.cursorrules', label: '.cursorrules  (Cursor IDE)', hint: 'Classic Cursor format' },
+        { value: 'skill.md', label: 'skill.md     (Universal)', hint: 'Canonical format' },
+        { value: 'claude.md', label: 'claude.md    (Claude Code)', hint: 'Claude Code agent skill' },
+        { value: 'mcp.json', label: 'mcp.json     (MCP Server)', hint: 'MCP server definition' },
+      ],
+    });
+    if (isCancel(fmt)) return;
+    await installSkill(manifest.name, { to: fmt as string, force: false, noTui: true });
+  }
+  // back → return without action, search exits
 }
 
 /**
