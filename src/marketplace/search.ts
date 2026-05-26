@@ -66,9 +66,10 @@ function askQuestion(prompt: string, validOptions: string[]): Promise<string> {
 
 /**
  * Show action menu after selecting a skill: preview, install, or back.
+ * Returns true if the user chose Back (should exit search).
  * Uses select when terminal supports it, falls back to simple Q&A.
  */
-async function showAndOfferInstall(manifest: SkillManifest): Promise<void> {
+async function showAndOfferInstall(manifest: SkillManifest): Promise<boolean> {
   const needsFallback = process.platform === 'win32' && !process.env.WT_SESSION;
 
   let action: string | symbol;
@@ -87,16 +88,19 @@ async function showAndOfferInstall(manifest: SkillManifest): Promise<void> {
       options: [
         { value: 'preview', label: 'Preview  Show full description and README' },
         { value: 'install', label: 'Install  Download and convert to local format' },
-        { value: 'back', label: 'Back     Return to search' },
+        { value: 'back', label: 'Back     Exit search' },
       ],
     });
-    if (isCancel(action)) return;
   }
+
+  if (isCancel(action) || action === 'back') return true; // exit search
 
   if (action === 'preview') {
     await showSkillInfo(manifest.name);
-    await showAndOfferInstall(manifest);
-  } else if (action === 'install') {
+    return await showAndOfferInstall(manifest); // back to menu
+  }
+
+  if (action === 'install') {
     let targetFormat: string;
 
     if (needsFallback) {
@@ -120,13 +124,16 @@ async function showAndOfferInstall(manifest: SkillManifest): Promise<void> {
           { value: 'mcp.json', label: 'mcp.json     (MCP Server)', hint: 'MCP server definition' },
         ],
       });
-      if (isCancel(fmt)) return;
+      if (isCancel(fmt)) return true;
       targetFormat = fmt as string;
     }
 
     await installSkill(manifest.name, { to: targetFormat, force: false, noTui: true });
+    console.log('');
+    return false; // continue searching
   }
-  // back → exit
+
+  return true; // fallback: exit
 }
 
 /**
@@ -169,28 +176,29 @@ export async function interactiveSearch(options: {
     log.info(`Filtered by tag: ${chalk.cyan(options.tag)} (${skills.length} skills)`);
   }
 
-  // Step 3: Interactive autocomplete prompt
-  const result = await autocomplete({
-    message: 'Search skills (type to filter, ↑↓ to navigate, Enter to select):',
-    options: skills.map((s) => ({
-      value: s,
-      label: formatSkillOption(s),
-      hint: `v${s.version}`,
-    })),
-    initialUserInput: options.query ?? '',
-    filter: skillFilter,
-    maxItems: 10,
-  });
+  // Step 3: Interactive search loop
+  while (true) {
+    const result = await autocomplete({
+      message: 'Search skills (type to filter, ↑↓ to navigate, Enter to select):',
+      options: skills.map((s) => ({
+        value: s,
+        label: formatSkillOption(s),
+        hint: `v${s.version}`,
+      })),
+      initialUserInput: options.query ?? '',
+      filter: skillFilter,
+      maxItems: 10,
+    });
 
-  if (isCancel(result)) {
-    outro('Search cancelled');
-    return;
+    if (isCancel(result)) break;
+
+    const selected = result as SkillManifest;
+    const shouldExit = await showAndOfferInstall(selected);
+    if (shouldExit) break;
+    // Install completed → loop restarts search prompt
   }
 
-  // Step 4: Show details for selected skill
-  const selected = result as SkillManifest;
-  outro(`Selected ${chalk.bold(selected.name)} v${selected.version}`);
-  await showAndOfferInstall(selected);
+  outro('Search finished');
 }
 
 /**
