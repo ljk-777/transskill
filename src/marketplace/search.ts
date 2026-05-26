@@ -3,6 +3,7 @@
  */
 
 import { intro, outro, autocomplete, select, isCancel, log, note, spinner } from '@clack/prompts';
+import { createInterface } from 'node:readline';
 import chalk from 'chalk';
 import type { SkillManifest, RegistryIndex } from './types.js';
 import { getRegistry, searchSkills } from './registry-client.js';
@@ -43,7 +44,7 @@ function skillFilter(search: string, option: { label?: string; value: SkillManif
  */
 function askQuestion(prompt: string, validOptions: string[]): Promise<string> {
   return new Promise((resolve) => {
-    const rl = require('node:readline').createInterface({
+    const rl = createInterface({
       input: process.stdin,
       output: process.stdout,
     });
