@@ -156,36 +156,43 @@ export async function getRegistry(
   forceRefresh = false,
   includeExternal = true,
 ): Promise<RegistryIndex> {
+  // 1. Load base index: from cache (if fresh) or remote
+  let index: RegistryIndex | null = null;
+
   if (!forceRefresh) {
-    const cached = readCache();
-    if (cached) return cached;
+    index = readCache();
   }
 
-  const remote = await fetchRemote();
-  writeCache(remote);
+  if (!index) {
+    index = await fetchRemote();
+    writeCache(index);
+  }
 
-  // Enrich with external sources
+  // 2. Always try to enrich with external sources (even from cache)
+  //    This ensures broken/empty external data gets fixed on next run
   if (includeExternal) {
     try {
       const externalSkills = await fetchAwesomeAgentSkills();
       if (externalSkills.length > 0) {
-        // Merge: registry entries take priority (dedup by name)
-        const existingNames = new Set(remote.skills.map((s) => s.name));
+        const existingNames = new Set(index.skills.map((s) => s.name));
+        let changed = false;
         for (const ext of externalSkills) {
           if (!existingNames.has(ext.name)) {
-            remote.skills.push(ext);
+            index.skills.push(ext);
+            changed = true;
           }
         }
-        remote.updated = new Date().toISOString();
-        // Rewrite cache with enriched data
-        writeCache(remote);
+        if (changed) {
+          index.updated = new Date().toISOString();
+          writeCache(index);
+        }
       }
     } catch {
       // External enrich is best-effort
     }
   }
 
-  return remote;
+  return index;
 }
 
 /**
